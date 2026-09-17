@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KIJANIFY · 조사 입력 · 현장조사 배정 · DDS 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:#009588; --teal-d:#00765a; --teal-l:#e6f6f3; --teal-m:#99f6e4;
+  --ok:#00a86b; --ok-l:#dcfce7; --warn:#d97706; --warn-l:#fff6e5; --bad:#e11d48; --bad-l:#ffe4e6;
+  --ink:#171717; --muted:#6b7280; --line:#e5e7eb; --bg:#f4f6f8; --card:#fff;
+  --side:#0c1412; --side-2:#15201c; --nav:#9ca3af;
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(15,23,42,.06);
+  --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:"Noto Sans KR",system-ui,sans-serif;background:#d5dbe3;color:var(--ink);font-size:13px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+a{color:inherit}
+
+.proto{
+  width:min(1480px,100%);margin:0 auto;padding:12px 12px 28px;
+}
+.proto-bar{
+  background:#111827;color:#e5e7eb;border-radius:14px;padding:8px 12px;margin-bottom:10px;
+  display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;
+}
+.proto-bar b{color:#fff;font-size:13px}
+.proto-bar span.sub{font-size:11px;color:#9ca3af}
+.pnav-block{margin-left:auto;display:flex;flex-direction:column;gap:3px;align-items:flex-end;max-width:78%}
+.pnav-block .lab{font-size:9px;color:#9ca3af;align-self:flex-end;line-height:1}
+.pnav-block .pnav{margin-left:0;display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+aside nav{flex:1;overflow:auto}
+.tl{border-left:2px solid #99f6e4;margin:4px 0 0 8px;padding-left:16px}
+.tl .ev{position:relative;padding:0 0 14px}
+.tl .ev::before{content:"";position:absolute;left:-21px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--teal)}
+.keep{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.pnav a{
+  color:#d1d5db;text-decoration:none;background:#1f2937;border:1px solid #374151;
+  padding:4px 8px;border-radius:999px;font-size:11px;font-weight:600;
+}
+.pnav a.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.pnav a em{font-style:normal;opacity:.7;margin-right:4px}
+
+.app{
+  min-height:820px;background:var(--bg);border-radius:14px;overflow:hidden;
+  box-shadow:0 18px 50px rgba(15,23,42,.2);display:none;position:relative;
+}
+.app.show{display:grid}
+.app.admin{grid-template-columns:188px 1fr}
+.app.client,.app.field{grid-template-columns:1fr}
+.app.field{min-height:860px}
+
+aside{
+  background:var(--side);color:#cbd5e1;display:flex;flex-direction:column;padding:14px 10px 10px;
+}
+.brand{display:flex;align-items:center;gap:9px;padding:6px 8px 16px;color:#fff}
+.brand i{width:30px;height:30px;border-radius:9px;background:var(--teal);display:grid;place-items:center;font-style:normal;font-weight:800;font-size:12px}
+.brand small{display:block;color:#6b7280;font-size:10px;font-weight:400}
+aside nav{flex:1}
+aside nav p{font-size:10px;letter-spacing:.1em;color:#64748b;padding:8px 10px 4px}
+aside nav a{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
+  color:var(--nav);text-decoration:none;font-weight:500;white-space:nowrap;
+}
+aside nav a.on{background:#14332c;color:#ecfdf5;font-weight:700}
+aside nav a.on::before{content:"";width:4px;height:16px;background:var(--teal);border-radius:4px;margin-left:-6px}
+.who{display:flex;align-items:center;gap:8px;padding:10px 8px;border-top:1px solid #1f2a26;color:#e5e7eb}
+.av{width:28px;height:28px;border-radius:50%;background:#134e4a;color:#99f6e4;display:grid;place-items:center;font-weight:700;font-size:11px}
+.who small{display:block;color:#6b7280;font-size:11px}
+
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{
+  height:56px;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;padding:0 20px;gap:10px;
+}
+.top h1{font-size:16px;font-weight:700}
+.crumb{color:var(--muted);font-size:12px}
+.sp{margin-left:auto}
+.search{
+  border:1px solid var(--line);background:#fafafa;border-radius:9px;padding:8px 12px;min-width:220px;color:var(--muted);
+  display:flex;align-items:center;gap:6px;
+}
+.search input{border:0;background:transparent;outline:none;width:100%;color:var(--ink)}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;color:var(--muted);position:relative}
+.icon-btn .dot{position:absolute;top:6px;right:7px;width:7px;height:7px;background:var(--bad);border-radius:50%}
+
+.client-top{
+  min-height:56px;height:auto;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;padding:8px 22px;gap:12px;flex-wrap:wrap;
+}
+.client-top nav{display:flex;gap:4px;flex-wrap:wrap}
+.client-top nav a{padding:8px 10px;border-radius:8px;text-decoration:none;color:#4b5563;font-weight:500;white-space:nowrap}
+.client-top nav a.on{color:var(--teal-d);background:var(--teal-l);font-weight:700}
+.cta{background:var(--teal);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:700}
+
+.page{flex:1;padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:12px;min-height:0}
+.delta{
+  background:#ecfeff;border:1px solid #a5f3fc;color:#155e75;
+  border-radius:10px;padding:8px 12px;font-size:12px;font-weight:600;
+  word-break:keep-all;
+}
+.delta b{color:#0e7490}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px}
+.card h3{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.kpi{display:grid;gap:10px}
+.kpi4{grid-template-columns:repeat(4,1fr)}
+.kpi3{grid-template-columns:repeat(3,1fr)}
+.kpi .card{padding:12px 14px}
+.kpi span{color:var(--muted);font-size:12px}
+.kpi b{display:block;font-size:22px;letter-spacing:-.03em;margin-top:2px}
+.kpi .card.hot{outline:2px solid #f59e0b}
+
+.row{display:flex;gap:12px;min-height:0}
+.col{flex:1;min-width:0}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+.b{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+.b.ok{background:var(--ok-l);color:#166534}
+.b.teal{background:var(--teal-l);color:var(--teal-d)}
+.b.warn{background:var(--warn-l);color:#b45309}
+.b.grey{background:#f3f4f6;color:#4b5563}
+.b.bad{background:var(--bad-l);color:#9f1239}
+.b.gap{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+
+.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 13px;font-weight:600;font-size:12.5px}
+.btn:hover{border-color:#cbd5e1}
+.btn.p{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.p:hover{background:var(--teal-d)}
+.btn.g{color:var(--muted)}
+.btn.ghost{background:transparent}
+.btn.warn{background:#fff7ed;border-color:#fdba74;color:#c2410c}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.steps{display:flex;gap:0}
+.steps button{
+  flex:1;background:transparent;border:0;border-bottom:3px solid #e5e7eb;
+  padding:10px 4px;font-size:12px;color:var(--muted);font-weight:600;
+}
+.steps button.on{color:var(--teal-d);border-color:var(--teal)}
+.steps button.done{color:var(--ok);border-color:var(--ok)}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);background:#fafafa}
+td{padding:10px;border-bottom:1px solid #f3f4f6;vertical-align:middle;word-break:keep-all}
+tr:last-child td{border-bottom:0}
+tr.sel td{background:#f0fdfa}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:#f8fafc}
+
+.drop{
+  border:1.5px dashed #99f6e4;background:#f0fdfa;border-radius:12px;
+  padding:28px 16px;text-align:center;color:#115e59;
+}
+.drop strong{display:block;font-size:14px;margin-bottom:4px}
+.filechip{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;margin-top:10px;font-weight:700}
+
+.maprow{display:grid;grid-template-columns:minmax(90px,1fr) 20px minmax(110px,1.2fr) 56px;gap:8px;align-items:center;margin-bottom:8px}
+.maprow .l,.maprow .r{border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conf{height:6px;background:#e5e7eb;border-radius:99px;overflow:hidden}
+.conf i{display:block;height:100%;background:var(--teal)}
+
+.prog{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:92px}
+.prog i{display:block;height:100%;background:var(--teal);border-radius:99px}
+
+.kanban{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;flex:1;min-height:0}
+@media (min-width:1280px){.kanban{grid-template-columns:repeat(4,minmax(200px,1fr))}}
+.col-k{background:#eef1f4;border-radius:12px;padding:10px;display:flex;flex-direction:column;min-height:0}
+.col-k h4{font-size:12px;display:flex;justify-content:space-between;margin-bottom:8px}
+.col-k .list{overflow:auto;display:flex;flex-direction:column;gap:8px;flex:1}
+.scard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;width:100%}
+.scard:hover,.scard.on{border-color:var(--teal);box-shadow:inset 0 0 0 1px var(--teal)}
+.scard .t{font-weight:700;font-size:13px}
+.scard .m{color:var(--muted);font-size:11px;margin:3px 0 6px}
+.gaps{display:flex;flex-wrap:wrap;gap:4px}
+
+.drawer{
+  position:absolute;inset:0;background:rgba(15,23,42,.35);display:none;z-index:8;justify-content:flex-end;
+}
+.drawer.show{display:flex}
+.panel{width:420px;background:#fff;height:100%;padding:18px 18px 16px;display:flex;flex-direction:column;gap:12px;box-shadow:-12px 0 40px rgba(0,0,0,.12)}
+.panel h2{font-size:16px}
+.choice{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center;cursor:pointer}
+.choice.on{border-color:var(--teal);background:#f0fdfa}
+.choice input{accent-color:var(--teal)}
+
+.seg{display:flex;background:#f3f4f6;border-radius:10px;padding:3px}
+.seg button{flex:1;border:0;background:transparent;padding:8px;border-radius:8px;font-weight:700;color:var(--muted)}
+.seg button.on{background:#fff;color:var(--teal-d);box-shadow:var(--shadow)}
+
+.li{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;margin-bottom:8px;cursor:pointer;text-align:left;width:100%}
+.li.sel{border-color:var(--teal);background:#f0fdfa;box-shadow:inset 0 0 0 1px var(--teal)}
+.li.dim{opacity:.55;background:#f9fafb;cursor:default}
+.hint{font-size:12px;color:var(--muted);line-height:1.5}
+.f{display:block;font-size:11px;color:var(--muted);margin:0 0 4px}
+.in,select.selx{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;width:100%}
+.in.au{background:#f0fdfa;border-color:#99f6e4;color:#115e59}
+.in.ro{background:#f9fafb;color:#6b7280}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.foot{display:flex;justify-content:flex-end;gap:8px;margin-top:auto;padding-top:8px;position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 20%)}
+
+.field-stage{flex:1;display:grid;place-items:center;background:
+  radial-gradient(800px 400px at 50% 0%,#d1fae5,transparent), var(--bg)}
+.phone{
+  width:380px;height:780px;background:#0f172a;border-radius:36px;padding:12px;
+  box-shadow:0 30px 60px rgba(0,0,0,.28);
+}
+.phone .scr{background:#f8fafc;color:var(--ink);border-radius:28px;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.ph-top{padding:14px 16px 8px;display:flex;justify-content:space-between;align-items:center}
+.ph-body{flex:1;overflow:auto;padding:8px 16px 12px}
+.ph-tab{display:flex;border-top:1px solid var(--line);background:#fff}
+.ph-tab button{flex:1;border:0;background:transparent;padding:10px 4px;font-size:11px;font-weight:700;color:#9ca3af}
+.ph-tab button.on{color:var(--teal-d)}
+
+.mapbox{
+  height:168px;border-radius:12px;border:1px solid #bbf7d0;position:relative;overflow:hidden;
+  background:
+    linear-gradient(#0000 40%, #04785722),
+    repeating-linear-gradient(90deg,#ecfdf5 0 18px,#d1fae5 18px 19px),
+    repeating-linear-gradient(#ecfdf5 0 18px,#d1fae5 18px 19px);
+}
+.poly{position:absolute;left:18%;top:22%;width:58%;height:52%;
+  background:rgba(0,149,136,.28);border:2px solid #00765a;
+  clip-path:polygon(18% 70%, 8% 32%, 48% 12%, 88% 28%, 72% 78%);
+}
+.pt{position:absolute;width:10px;height:10px;background:#fff;border:2px solid #00765a;border-radius:50%}
+
+.entity{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}
+.entity.ok{border-color:#86efac;background:#f0fdf4}
+.entity.bad{border-color:#fda4af;background:#fff1f2}
+.entity .src{font-size:11px;color:var(--muted)}
+
+.toast{
+  position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+  background:#111827;color:#fff;padding:10px 16px;border-radius:999px;font-weight:600;display:none;z-index:20;
+}
+.toast.show{display:block}
+
+.exbox{
+  background:#fffbeb;border:1px dashed #fcd34d;border-radius:10px;padding:10px 12px;
+  font-size:12px;color:#92400e;display:flex;flex-direction:column;gap:4px;
+}
+.exbox .bar{margin-bottom:4px}
+.exbox b{color:#78350f}
+.exbox code,.exbox pre{
+  background:#fff;border:1px solid #fde68a;padding:1px 6px;border-radius:4px;
+  font-size:11px;font-family:ui-monospace,Consolas,monospace;color:#78350f;
+}
+.exbox pre{padding:8px;overflow:auto}
+
+.hide{display:none !important}
+.chain{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap}
+.node{flex:1;min-width:90px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center}
+.node.on{border-color:var(--teal);background:#f0fdfa}
+.node b{display:block;font-size:12px}
+.node span{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.arr{align-self:center;color:#9ca3af;font-weight:800}
+
+@media (max-width:900px){
+  .kpi4,.kpi3{grid-template-columns:repeat(2,1fr)}
+  .app.admin{grid-template-columns:1fr}
+  aside{display:none}
+  .row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="proto">
+  <div class="proto-bar">
+    <div>
+      <b>KIJANIFY 프로토타입</b>
+      <span class="sub">파일 등록부터 탄소·EUDR 보관까지 · 예시 화면으로 사용 흐름을 보여 줍니다</span>
+    </div>
+    <div class="pnav-block">
+      <div class="lab">조사 흐름</div>
+      <nav class="pnav">
+        <a href="#import" class="on" data-go="import"><em>1</em>외부 데이터 등록</a>
+        <a href="#complete" data-go="complete"><em>2</em>정보 누락 확인</a>
+        <a href="#assign" data-go="assign"><em>3</em>현장조사 배정</a>
+        <a href="#farm" data-go="farm"><em>4</em>조사할 농장 선택</a>
+        <a href="#plot" data-go="plot"><em>5</em>농장 구역·위치 등록</a>
+        <a href="#request" data-go="request"><em>6</em>조사 신청</a>
+        <a href="#dds" data-go="dds"><em>7</em>DDS 규제대응 문서 생성</a>
+      </nav>
+      <div class="lab">기준정보 · 탄소 · 규제</div>
+      <nav class="pnav">
+        <a href="#dash" data-go="dash"><em>8</em>운영 현황</a>
+        <a href="#masters" data-go="masters"><em>9</em>생산자·농가</a>
+        <a href="#coop" data-go="coop"><em>10</em>협동조합</a>
+        <a href="#trace" data-go="trace"><em>11</em>공급망 이력</a>
+        <a href="#carbon" data-go="carbon"><em>12</em>탄소 산정</a>
+        <a href="#factors" data-go="factors"><em>13</em>배출계수</a>
+        <a href="#eudr" data-go="eudr"><em>14</em>EUDR 증빙·보관</a>
+      </nav>
+      <div class="lab">관리</div>
+      <nav class="pnav">
+        <a href="#users" data-go="users"><em>15</em>사용자·권한</a>
+        <a href="#notices" data-go="notices"><em>16</em>공지</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- 1 Import -->
+  <section class="app admin show" id="import">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav>
+        <p>업무</p>
+        <a>대시보드</a>
+        <a class="on"><span>외부 데이터 등록</span></a>
+        <a href="#complete">정보 누락 관리</a>
+        <a href="#assign">현장조사 관리</a>
+        <a>조사결과 검수</a>
+        <a href="#dds">DDS/EUDR 문서</a>
+        <p>관리</p>
+        <a>조사원 관리</a>
+        <a>회사 관리</a>
+      </nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">데이터 등록</div>
+        <h1>농장·공급망 데이터 등록</h1>
+        <div class="sp"></div>
+        <div class="search">파일명, 조합명</div>
+        <button class="icon-btn" type="button">3<span class="dot"></span></button>
+      </div>
+      <div class="page">
+        <div class="delta">엑셀·CSV로 농장·공급망 정보를 등록합니다. 빠진 정보는 현장조사로 이어서 채웁니다.</div>
+        <div id="imp-ex"></div>
+        <div class="card" style="padding-top:6px">
+          <div class="steps" id="imp-steps">
+            <button type="button" class="on" data-step="1">1 파일 업로드</button>
+            <button type="button" data-step="2">2 파일 항목 확인</button>
+            <button type="button" data-step="3">3 기존 데이터 확인</button>
+            <button type="button" data-step="4">4 등록 완료</button>
+          </div>
+        </div>
+        <div id="imp-step-1">
+          <div class="drop" id="imp-drop">
+            <strong>Excel·CSV 파일을 놓거나 선택하세요</strong>
+            <span class="hint">현재 Excel·CSV 파일을 등록할 수 있습니다. 아래 샘플로 바로 시연할 수 있습니다.</span>
+            <div class="bar" style="justify-content:center;margin-top:12px">
+              <label class="btn p">파일 선택<input id="imp-file" type="file" accept=".csv,.txt,.xlsx" class="hide"></label>
+              <button class="btn" type="button" id="imp-sample">샘플 CSV로 시연</button>
+            </div>
+            <div class="filechip hide" id="imp-filechip"></div>
+          </div>
+        </div>
+        <div class="row hide" style="flex:1" id="imp-step-2">
+          <div class="card col">
+            <h3 id="imp-map-title">업로드한 파일의 항목을 확인해주세요</h3>
+            <div id="imp-map-list"></div>
+            <p class="hint" style="margin-top:8px">연결이 맞지 않으면 오른쪽에서 올바른 항목을 선택하세요. 비어 있는 열은 연결할 항목을 선택해주세요.</p>
+          </div>
+          <div class="card col">
+            <h3 id="imp-preview-head">미리보기</h3>
+            <table style="margin-top:12px">
+              <thead><tr><th>농장</th><th>생산자</th><th>위치정보</th><th>생산자 연락처</th></tr></thead>
+              <tbody id="imp-preview-body"></tbody>
+            </table>
+            <div class="bar" style="margin-top:12px" id="imp-stats"></div>
+          </div>
+        </div>
+        <div class="card hide" id="imp-step-3">
+          <h3>기존 데이터와 같은 항목인지 확인해주세요</h3>
+          <table>
+            <thead><tr><th>파일</th><th>현재 등록된 정보</th><th>일치 가능성</th><th>처리</th></tr></thead>
+            <tbody id="imp-dup-body"></tbody>
+          </table>
+        </div>
+        <div class="card hide" id="imp-step-4">
+          <h3>등록 완료</h3>
+          <p class="hint" id="imp-done-msg">파일을 등록하면 누락된 정보를 확인하는 화면으로 이동합니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn g" type="button" id="imp-prev">이전</button>
+          <button class="btn p" type="button" id="imp-next">다음 · 파일 항목 확인</button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 2 Completeness -->
+  <section class="app admin" id="complete">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav>
+        <p>업무</p>
+        <a href="#import">외부 데이터 등록</a>
+        <a class="on">정보 누락 관리</a>
+        <a href="#assign">현장조사 관리</a>
+        <a>조사결과 검수</a>
+        <a href="#dds">DDS/EUDR 문서</a>
+      </nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">정보 누락 확인</div>
+        <h1>농장정보 누락 현황</h1>
+        <div class="sp"></div>
+        <div class="search"><input id="complete-search" placeholder="농장, 조합, 추가로 필요한 정보  예: Esperanza"></div>
+      </div>
+      <div class="page">
+        <div class="delta">빠진 정보를 확인한 뒤 현장조사를 배정하세요. <b>필수정보 입력 완료</b>된 건만 DDS/EUDR 문서와 탄소 산정에 사용할 수 있습니다.</div>
+        <div id="complete-ex"></div>
+        <div class="kpi kpi4">
+          <div class="card"><span>전체 농장·조합 정보</span><b id="kpi-all">0</b></div>
+          <div class="card"><span>필수정보 입력 완료</span><b id="kpi-ready" style="color:#166534">0</b></div>
+          <div class="card hot"><span>추가정보 필요</span><b id="kpi-gap" style="color:#b45309">0</b></div>
+          <div class="card"><span>현장조사 진행 중</span><b id="kpi-survey">0</b></div>
+        </div>
+        <div class="card" style="flex:1;display:flex;flex-direction:column">
+          <div class="bar" style="margin-bottom:8px" id="complete-filters">
+            <button class="btn p" type="button" data-cfilter="gap">추가정보 필요</button>
+            <button class="btn g" type="button" data-cfilter="gps">위치정보 없음</button>
+            <button class="btn g" type="button" data-cfilter="phone">생산자 연락처 없음</button>
+            <button class="btn g" type="button" data-cfilter="ready">필수정보 입력 완료</button>
+            <span class="sp"></span>
+            <span class="hint" id="complete-selected">0건 선택됨</span>
+            <a class="btn p" href="#assign" id="complete-assign">선택한 건을 조사원에게 배정</a>
+          </div>
+          <table>
+            <thead><tr><th></th><th>농장 / 조합</th><th>출처</th><th>정보 입력률</th><th>추가로 필요한 정보</th><th>처리</th></tr></thead>
+            <tbody id="complete-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 3 Assign -->
+  <section class="app admin" id="assign">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav>
+        <p>업무</p>
+        <a href="#import">외부 데이터 등록</a>
+        <a href="#complete">정보 누락 관리</a>
+        <a class="on">현장조사 관리</a>
+        <a>조사결과 검수</a>
+        <a href="#dds">DDS/EUDR 문서</a>
+      </nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">현장조사 관리</div>
+        <h1>현장조사 배정 및 진행현황</h1>
+        <div class="sp"></div>
+        <div class="seg" style="width:220px">
+          <button class="on" type="button">칸반</button>
+          <button type="button">목록</button>
+        </div>
+      </div>
+      <div class="page">
+        <div class="delta">조사원에게 현장조사를 배정하고 진행 상태를 확인합니다. 카드에서 농장과 <b>추가로 필요한 정보</b>를 바로 볼 수 있습니다.</div>
+        <div id="assign-ex"></div>
+        <div class="kanban">
+          <div class="col-k">
+            <h4>배정 대기 <span class="b grey" id="k-new-n">0</span></h4>
+            <div class="list" id="k-new"></div>
+          </div>
+          <div class="col-k">
+            <h4>조사원 배정 완료 <span class="b teal" id="k-as-n">0</span></h4>
+            <div class="list" id="k-as"></div>
+          </div>
+          <div class="col-k">
+            <h4>현장조사 진행 중 <span class="b teal" id="k-pr-n">0</span></h4>
+            <div class="list" id="k-pr"></div>
+          </div>
+          <div class="col-k">
+            <h4>조사 완료·검수 <span class="b grey" id="k-rv-n">0</span></h4>
+            <div class="list" id="k-rv"></div>
+          </div>
+        </div>
+      </div>
+      <div class="drawer" id="assign-drawer">
+        <div class="panel">
+          <div class="bar"><h2 id="ad-title">현장조사 배정</h2><button class="btn g" type="button" id="ad-close">닫기</button></div>
+          <p class="hint" id="ad-meta"></p>
+          <div class="card" style="padding:10px 12px">
+            <div class="hint">이번 조사에서 확인할 정보</div>
+            <div class="gaps" style="margin-top:6px" id="ad-gaps"></div>
+          </div>
+          <div>
+            <label class="f">조사원</label>
+            <div id="ad-surveyors"></div>
+          </div>
+          <p class="hint">지금은 조사원 1명을 배정합니다.</p>
+          <div class="foot" style="position:static">
+            <button class="btn g" type="button" id="ad-cancel">취소</button>
+            <button class="btn p" type="button" id="ad-go">조사원에게 배정하기</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 4 Surveyor farm -->
+  <section class="app field" id="farm">
+    <div class="field-stage">
+      <div class="phone">
+        <div class="scr">
+          <div class="ph-top">
+            <div>
+              <div class="hint">오늘 할 조사</div>
+              <b>Huila · 추가 확인 2건</b>
+            </div>
+            <span class="b teal">Aliku</span>
+          </div>
+          <div class="ph-body">
+            <div class="delta" style="margin-bottom:10px">빈 입력칸부터 시작하지 마세요. <b>등록된 농장이 맞는지</b> 먼저 고릅니다.</div>
+            <div id="farm-ex"></div>
+            <div class="seg" id="farm-seg">
+              <button class="on" type="button" data-mode="exist">등록된 농장 선택</button>
+              <button type="button" data-mode="new">새 농장 등록</button>
+            </div>
+            <div id="farm-exist" style="margin-top:12px">
+              <div class="search" style="width:100%;margin-bottom:10px"><input id="farm-search" placeholder="예: Esperanza, Maria, Arua"></div>
+              <div id="farm-list"></div>
+            </div>
+            <div id="farm-new" class="hide" style="margin-top:12px">
+              <label class="f">농장명 · 예: Finca Los Andes</label>
+              <input class="in" id="nf-name" placeholder="Finca Los Andes">
+              <div class="grid2" style="margin-top:8px">
+                <div><label class="f">생산자 · 예: Andres Ruiz</label><input class="in" id="nf-farmer" placeholder="Andres Ruiz"></div>
+                <div><label class="f">연락처 · 예: +57 608 836 2000</label><input class="in" id="nf-phone" placeholder="+57 608 836 2000"></div>
+              </div>
+              <div class="grid2" style="margin-top:8px">
+                <div><label class="f">소속 조합</label><input class="in au" value="COOP-001 Huila" readonly></div>
+                <div><label class="f">생산량 kg · 예: 860</label><input class="in" id="nf-kg" placeholder="860"></div>
+              </div>
+              <p class="hint" style="margin-top:8px">등록한 농장은 저장되며 다음 조사부터 다시 선택할 수 있습니다.</p>
+            </div>
+          </div>
+          <div style="padding:8px 16px 4px">
+            <button class="btn p" id="farm-go" type="button" style="width:100%">이 농장 조사 시작</button>
+          </div>
+          <div class="ph-tab">
+            <button class="on" type="button">배정된 조사</button>
+            <button type="button">농장정보</button>
+            <button type="button">조사 제출</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 농장 구역·위치 -->
+  <section class="app field" id="plot">
+    <div class="field-stage">
+      <div class="phone">
+        <div class="scr">
+          <div class="ph-top">
+            <a href="#farm" class="hint" style="text-decoration:none">← 농장정보</a>
+            <b id="plot-title">농장</b>
+            <span id="plot-gap"></span>
+          </div>
+          <div class="ph-body">
+            <div class="delta" style="margin-bottom:10px">등록된 기본정보는 바꿀 수 없습니다. 이번 수확 실적과 <b>농장 구역 위치</b>만 입력합니다.</div>
+            <div id="plot-ex"></div>
+            <div class="card" style="padding:10px">
+              <label class="f">농장 (등록된 기본정보)</label>
+              <input class="in ro" id="plot-farm-ro" value="" readonly>
+              <div class="grid2" style="margin-top:8px">
+                <div><label class="f">조사 대상 수확연도 · 예: 2025</label><input class="in" id="plot-year" placeholder="2025"></div>
+                <div><label class="f">해당 연도 생산량 (kg) · 예: 1250</label><input class="in" id="plot-kg" placeholder="1250"></div>
+              </div>
+            </div>
+            <div class="bar" style="margin:12px 0 8px"><h3 style="margin:0">농장 구역(Plot)</h3><button class="btn p" type="button" id="plot-add">+ 농장 구역 추가</button></div>
+            <div id="plots"></div>
+          </div>
+          <div style="padding:8px 16px">
+            <button class="btn p" style="width:100%" type="button" id="plot-save">조사 완료 후 제출</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 Client request -->
+  <section class="app client" id="request">
+    <main>
+      <div class="client-top">
+        <div class="brand" style="padding:0;color:var(--ink)"><i>K</i><div>kijanify</div></div>
+        <nav>
+          <a>대시보드</a>
+          <a>조사현황 및 DDS/EUDR 문서</a>
+          <a class="on">조사 신청</a>
+          <a>탄소 추적</a>
+        </nav>
+        <div class="sp"></div>
+        <span class="b teal">Song&amp;Stark</span>
+        <button class="cta" type="button">+ 조사 신청</button>
+      </div>
+      <div class="page" style="max-width:1080px;margin:0 auto;width:100%">
+        <div class="delta">조사 대상 제품만 입력하면 됩니다. 오른쪽에서 <b>연결된 농장·공급망</b>을 확인하세요.</div>
+        <div id="req-ex"></div>
+        <div class="card" style="padding-top:8px">
+          <div class="steps">
+            <button class="on" type="button">1 조사 대상 제품 입력</button>
+            <button type="button">2 관련 농장·공급망 확인</button>
+          </div>
+        </div>
+        <div class="row" style="flex:1">
+          <div class="card col">
+            <h3>조사 대상 제품 정보</h3>
+            <div class="grid2">
+              <div><label class="f">수확연도 * · 예: 2025</label><input class="in" id="req-year" placeholder="2025"></div>
+              <div><label class="f">HS 코드 * · 예: 090111</label><input class="in" id="req-hs" placeholder="090111"></div>
+              <div style="grid-column:1/-1"><label class="f">상품명 * · 예: Decarbon Coffee Huila Green Coffee</label><input class="in" id="req-name" placeholder="Decarbon Coffee Huila Green Coffee"></div>
+              <div><label class="f">생산국 · 예: Colombia (CO)</label><input class="in au" id="req-country" value="Colombia (CO)" readonly></div>
+              <div><label class="f">지역 · 예: Huila</label><input class="in" id="req-site" placeholder="Huila"></div>
+            </div>
+            <div class="drop" style="margin-top:14px;padding:16px">
+              <strong>거래 관련 파일 첨부 (선택)</strong>
+              <span class="hint">파일이 없어도 연결된 농장 정보만으로 신청할 수 있습니다.</span>
+            </div>
+          </div>
+          <div class="card" style="width:340px;flex:0 0 340px">
+            <h3>연결된 공급망 정보</h3>
+            <div class="chain" style="flex-direction:column" id="req-chain"></div>
+            <p class="hint" style="margin-top:10px">기존에 등록된 생산자·가공시설 정보는 자동으로 불러옵니다. 추가로 필요한 정보는 조사원이 현장에서 채웁니다.</p>
+            <div class="gaps" id="req-gaps"></div>
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn g" type="button" id="req-draft">임시저장</button>
+          <button class="btn p" type="button" id="req-submit">조사 신청하기</button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 7 DDS -->
+  <section class="app admin" id="dds">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav>
+        <p>업무</p>
+        <a href="#import">외부 데이터 등록</a>
+        <a href="#complete">정보 누락 관리</a>
+        <a href="#assign">현장조사 관리</a>
+        <a>조사결과 검수</a>
+        <a class="on">DDS/EUDR 문서</a>
+      </nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">DDS/EUDR 문서</div>
+        <h1>DDS 정보 확인 및 문서 생성</h1>
+        <div class="sp"></div>
+        <span class="b ok">필수정보 입력 완료</span>
+      </div>
+      <div class="page">
+        <div class="delta">기존에 등록된 생산자·가공시설·수출업체 정보를 확인하고 <b>DDS 문서</b>를 만듭니다.</div>
+        <div id="dds-ex"></div>
+        <div class="row" style="flex:1">
+          <div class="card" style="width:260px;flex:0 0 260px">
+            <h3>DDS 생성 대상</h3>
+            <div id="dds-list"></div>
+          </div>
+          <div class="col" id="dds-idle">
+            <div class="row" id="dds-entities"></div>
+            <div class="card" style="margin-top:12px">
+              <h3>DDS 생성 전 필수정보 확인</h3>
+              <table id="dds-check"></table>
+            </div>
+            <div class="foot" style="position:static">
+              <button class="btn g" type="button" id="dds-back">조사정보 다시 확인</button>
+              <button class="btn p" type="button" id="dds-gen">DDS 문서 생성</button>
+            </div>
+          </div>
+          <div class="col hide" id="dds-done">
+            <div class="card" style="text-align:center;padding:28px">
+              <div class="b ok" style="font-size:12px">DDS 생성 완료 · 버전 1</div>
+              <h2 style="margin:10px 0 6px;font-size:20px" id="dds-file">DDS.pdf</h2>
+              <p class="hint" id="dds-when"></p>
+              <div class="bar" style="justify-content:center;margin-top:16px">
+                <button class="btn p" type="button" id="dds-dl">DDS 다운로드</button>
+                <button class="btn" type="button" id="dds-alert">고객에게 완료 알림 보내기</button>
+                <button class="btn g" type="button" id="dds-v2">수정사항 반영하여 새 버전 생성</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 8 Dashboard -->
+  <section class="app admin" id="dash">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">운영 현황</div>
+        <h1>오늘 확인할 업무</h1>
+        <div class="sp"></div>
+        <span class="b teal">시연용 숫자 · Huila 샘플</span>
+      </div>
+      <div class="page">
+        <div class="delta">조사 상태, 추가로 필요한 정보, DDS/EUDR로 쓸 수 있는 건수를 한 화면에서 봅니다. 카드를 누르면 해당 업무로 이동합니다.</div>
+        <div class="kpi kpi4" id="dash-kpi"></div>
+        <div class="row" style="flex:1">
+          <div class="card col">
+            <h3>지금 처리할 일</h3>
+            <div id="dash-todo"></div>
+          </div>
+          <div class="card" style="width:340px;flex:0 0 340px">
+            <h3>규제 대응 가능 여부</h3>
+            <p class="hint" id="dash-reg"></p>
+            <div id="dash-ready"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 9 Masters -->
+  <section class="app admin" id="masters">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">기준정보 / 생산자·농가</div>
+        <h1>생산자·농가 기본정보</h1>
+        <div class="sp"></div>
+        <div class="search"><input id="master-search" placeholder="예: Maria, Esperanza"></div>
+      </div>
+      <div class="page">
+        <div class="delta">조사 건과 따로 저장된 농가입니다. 매년 조사가 늘어도 생산자를 다시 등록하지 않습니다.</div>
+        <div id="master-ex"></div>
+        <div class="card" style="flex:1;overflow:auto">
+          <table>
+            <thead><tr><th>농장</th><th>생산자</th><th>소속 조합</th><th>위치정보</th><th>상태</th><th>처리</th></tr></thead>
+            <tbody id="master-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 10 Coop -->
+  <section class="app admin" id="coop">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">기준정보 / 협동조합</div>
+        <h1>협동조합 기본정보</h1>
+      </div>
+      <div class="page">
+        <div class="delta">조합은 여러 농가의 묶음입니다. 조합 코드 체계는 아직 정해지지 않아, 이 화면에서는 <b>코드 칸을 비워 둔 채</b> 소속 농가만 보여 줍니다.</div>
+        <div id="coop-ex"></div>
+        <div class="row" style="flex:1">
+          <div class="card" style="width:360px;flex:0 0 360px" id="coop-card"></div>
+          <div class="card col">
+            <h3>이 조합에 연결된 농가</h3>
+            <div id="coop-farms"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 11 Trace -->
+  <section class="app admin" id="trace">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">공급망 이력</div>
+        <h1>공급망 단계별 이력</h1>
+        <div class="sp"></div>
+        <span class="b teal">LOT-HC-2025-014</span>
+      </div>
+      <div class="page">
+        <div class="delta">한 로트가 생산 → 가공 → 수출로 어떻게 이어지는지 봅니다. 위험도 자동 판정은 이 화면에 넣지 않았습니다.</div>
+        <div id="trace-chain" class="card"></div>
+        <div class="row" style="flex:1">
+          <div class="card col">
+            <h3>시간 순 이력</h3>
+            <div class="tl" id="trace-tl"></div>
+          </div>
+          <div class="card" style="width:300px;flex:0 0 300px">
+            <h3>이 화면에서 하는 일</h3>
+            <p class="hint">1. 로트 또는 농장을 고릅니다.<br>2. 단계가 빠지지 않았는지 확인합니다.<br>3. DDS·탄소는 이 이력을 그대로 씁니다.</p>
+            <a class="btn p" href="#carbon" style="margin-top:10px;display:inline-block;text-decoration:none">이 이력으로 탄소 산정 보기</a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 12 Carbon -->
+  <section class="app admin" id="carbon">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">탄소 산정</div>
+        <h1>조사 정보로 탄소 배출량 보기</h1>
+      </div>
+      <div class="page">
+        <div class="delta">숫자는 조사·공급망에서 불러옵니다. 여기서 다시 치지 않습니다. 산정식은 시연용이며 실제 특허 공식과 다를 수 있습니다.</div>
+        <div id="carbon-ex"></div>
+        <div class="kpi kpi4" id="carbon-kpi"></div>
+        <div class="row" style="flex:1">
+          <div class="card col">
+            <h3>불러온 활동량</h3>
+            <table>
+              <thead><tr><th>항목</th><th>출처</th><th>값</th></tr></thead>
+              <tbody id="carbon-act"></tbody>
+            </table>
+            <div class="bar" style="margin-top:10px">
+              <button class="btn" type="button" id="carbon-fill">Huila 예시 값으로 보기</button>
+              <a class="btn g" href="#factors">배출계수 버전 확인</a>
+            </div>
+          </div>
+          <div class="card" style="width:320px;flex:0 0 320px">
+            <h3>적용 중인 계수</h3>
+            <div id="carbon-ef"></div>
+            <p class="hint" style="margin-top:8px">과거 산정을 열면 당시 계수 버전이 유지됩니다. 이 프로토타입에서는 현재 버전만 바꿉니다.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 13 Factors -->
+  <section class="app admin" id="factors">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">탄소 / 배출계수</div>
+        <h1>배출계수 확인·버전 바꾸기</h1>
+      </div>
+      <div class="page">
+        <div class="delta">관리자가 계수를 코드가 아니라 이 목록에서 고릅니다. 값을 바꾸면 이후 산정에만 쓰이고, 이미 끝난 산정은 건드리지 않는 것이 목표입니다.</div>
+        <div id="factor-ex"></div>
+        <div class="card" style="flex:1">
+          <table>
+            <thead><tr><th>구분</th><th>값</th><th>단위</th><th>버전</th><th>상태</th><th>처리</th></tr></thead>
+            <tbody id="factor-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 14 EUDR archive -->
+  <section class="app admin" id="eudr">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">DDS/EUDR / 증빙·보관</div>
+        <h1>EUDR 증빙을 붙이고 보관하기</h1>
+      </div>
+      <div class="page">
+        <div class="delta">적법성 8항목 입력 칸은 아직 넣지 않았습니다. 이 화면은 <b>분석 결과가 농장에 붙고, 증빙과 함께 5년 보관되는 사용 순서</b>만 보여 줍니다.</div>
+        <div id="eudr-ex"></div>
+        <div class="kpi kpi4" id="eudr-kpi"></div>
+        <div class="row" style="flex:1">
+          <div class="card col" id="eudr-sat"></div>
+          <div class="card col">
+            <h3>증빙 · 보관</h3>
+            <div id="eudr-keep"></div>
+            <div class="bar" style="margin-top:12px">
+              <button class="btn" type="button" id="eudr-photo">증빙사진 추가 (예시)</button>
+              <button class="btn p" type="button" id="eudr-export">EU 제출용으로 내보내기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 15 Users / RLS -->
+  <section class="app admin" id="users">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">관리 / 사용자·권한</div>
+        <h1>누가 어떤 농가를 보는지 확인</h1>
+      </div>
+      <div class="page">
+        <div class="delta">회사별 데이터 분리(RLS)는 서버에서 막습니다. 이 화면은 <b>관리자·고객·조사원이 각각 무엇을 보는지</b> 감을 잡기 위한 예시입니다.</div>
+        <div id="user-ex"></div>
+        <div class="row" style="flex:1">
+          <div class="card" style="width:360px;flex:0 0 360px">
+            <h3>계정 예시</h3>
+            <div id="user-list"></div>
+          </div>
+          <div class="card col">
+            <h3>이 계정이 보는 농가</h3>
+            <p class="hint" id="user-scope"></p>
+            <div id="user-preview"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- 16 Notices -->
+  <section class="app admin" id="notices">
+    <aside>
+      <div class="brand"><i>K</i><div>Kijanify<small>관리자</small></div></div>
+      <nav></nav>
+      <div class="who"><div class="av">완</div><div>Wan Song<small>관리자</small></div></div>
+    </aside>
+    <main>
+      <div class="top">
+        <div class="crumb">관리 / 공지</div>
+        <h1>조사원·고객에게 공지하기</h1>
+      </div>
+      <div class="page">
+        <div class="delta">실제 푸시·메일 발송은 붙이지 않았습니다. <b>누구 대상인지 고르고, 내용을 쓰고, 게시하는 순서</b>만 보여 줍니다.</div>
+        <div id="ntc-ex"></div>
+        <div class="row" style="flex:1">
+          <div class="card col">
+            <h3>게시된 공지</h3>
+            <div id="ntc-list"></div>
+          </div>
+          <div class="card" style="width:380px;flex:0 0 380px">
+            <h3>새 공지 쓰기</h3>
+            <label class="f">제목</label>
+            <input class="in" id="ntc-title" placeholder="예: EUDR 증빙사진 촬영 요청">
+            <label class="f" style="margin-top:8px">대상</label>
+            <select class="selx" id="ntc-audience">
+              <option>조사원</option>
+              <option>고객</option>
+              <option>관리자</option>
+              <option>전체</option>
+            </select>
+            <label class="f" style="margin-top:8px">내용</label>
+            <textarea class="in" id="ntc-body" rows="5" placeholder="예: Esperanza·El Roble 조사 시 토지 증빙사진을 2장 이상 찍어 주세요."></textarea>
+            <div class="bar" style="margin-top:12px">
+              <button class="btn" type="button" id="ntc-fill">작성 예시 채우기</button>
+              <button class="btn p" type="button" id="ntc-post">게시</button>
+            </div>
+            <div id="ntc-preview" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="js/sample-data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
