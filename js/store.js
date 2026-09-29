@@ -121,26 +121,98 @@
     return n;
   }
 
+  function detectFormatErrors(rows) {
+    return rows.map((row, idx) => {
+      const lat = parseFloat(row.GPS_lat);
+      const lng = parseFloat(row.GPS_lng);
+      const errs = [];
+      if (row.GPS_lat && (!Number.isFinite(lat) || lat < -90 || lat > 90)) {
+        errs.push("위도가 -90~90 범위를 벗어남 (" + row.GPS_lat + ")");
+      }
+      if (row.GPS_lng && (!Number.isFinite(lng) || lng < -180 || lng > 180)) {
+        errs.push("경도가 -180~180 범위를 벗어남");
+      }
+      return errs.length ? { idx, row, errs } : null;
+    }).filter(Boolean);
+  }
+
+  function calcAreaHa(farm) {
+    const plot = (farm.plots || []).find((p) => (p.points || []).length >= 3);
+    if (!plot) return null;
+    const pts = plot.points;
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      s += a.lng * b.lat - b.lng * a.lat;
+    }
+    const ha = Math.abs(s) / 2 * 111 * 111 * 100;
+    return +ha.toFixed(2);
+  }
+
+  function farmDupMatches(farm) {
+    const hits = [];
+    const farmerOk = farm.farmer && farm.farmer !== "(조합)";
+    state.farms.forEach((o) => {
+      if (o.id === farm.id) return;
+      const nameScore = similar(farm.name, o.name);
+      const farmerScore = farmerOk && o.farmer !== "(조합)" ? similar(farm.farmer, o.farmer) : 0;
+      const score = Math.max(nameScore, farmerScore);
+      if (score >= 85) hits.push({ other: o, score: score, kind: "farm" });
+    });
+    (state.master.coops || []).forEach((c) => {
+      const score = similar(farm.name, c.name);
+      if (score >= 85) hits.push({ other: c, score: score, kind: "coop" });
+    });
+    return hits;
+  }
+
+  function farmErrors(farm) {
+    const errs = [];
+    (farm.plots || []).forEach((p) => {
+      (p.points || []).forEach((pt) => {
+        if (pt.lat < -90 || pt.lat > 90) errs.push("위도 범위 오류");
+        if (pt.lng < -180 || pt.lng > 180) errs.push("경도 범위 오류");
+      });
+    });
+    if (farm.kg !== "" && farm.kg != null && isNaN(Number(farm.kg))) errs.push("생산량이 숫자가 아님");
+    const calc = calcAreaHa(farm);
+    if (farm.areaHa && calc != null) {
+      const entered = Number(farm.areaHa);
+      if (entered > 0 && Math.abs(entered - calc) / entered > 0.3) {
+        errs.push("입력 면적과 경계 계산 면적 차이");
+      }
+    }
+    return errs;
+  }
+
   const state = {
     farms: clone(S.INITIAL_FARMS),
     master: clone(S.MASTER),
-    importFile: { name: "", headers: [], rows: [], mapping: [], dups: [], step: 1 },
+    importFile: { name: "", headers: [], rows: [], mapping: [], dups: [], errors: [], step: 1 },
     selectedFarmId: "FARM-ESPERANZA",
     selectedSurveyorId: "SV-ALIKU",
     selectedDdsId: "FARM-LALITPUR",
     requests: [],
     ddsDocs: [],
+    arrDocs: [],
     factors: clone(S.FACTORS),
     carbonInput: clone(S.CARBON_SAMPLE),
     eudr: clone(S.EUDR_SAMPLE),
     users: clone(S.USERS),
     notices: clone(S.NOTICES),
+    deliveries: clone(S.DELIVERIES),
+    dispatches: clone(S.DISPATCHES),
+    procLogs: clone(S.PROC_LOGS),
     viewAsUserId: "U-WAN",
     selectedNoticeId: "N-1",
     completeFilter: "gap",
     completeQuery: "",
     farmQuery: "",
     farmMode: "exist",
+    farmTab: "survey",
+    ddsMode: "survey",
+    requestPurposes: { dds: true, carbon: true, trace: true },
     requestStep: 1
   };
 
@@ -154,7 +226,11 @@
     parseCsv,
     autoMap,
     detectDuplicates,
+    detectFormatErrors,
     emptyCells,
+    farmDupMatches,
+    farmErrors,
+    calcAreaHa,
     getFarm(id) {
       return state.farms.find((f) => f.id === id);
     },
@@ -174,6 +250,8 @@
         if (state.completeFilter === "gps" && !gaps.some((g) => g.indexOf("위치정보") >= 0 || g.indexOf("농장 경계") >= 0)) return false;
         if (state.completeFilter === "phone" && !gaps.includes("생산자 연락처 없음")) return false;
         if (state.completeFilter === "ready" && f.status !== "ready") return false;
+        if (state.completeFilter === "dup" && !farmDupMatches(f).length) return false;
+        if (state.completeFilter === "error" && !farmErrors(f).length) return false;
         if (!q) return true;
         return [f.name, f.farmer, f.coopId, gaps.join(" ")].join(" ").toLowerCase().indexOf(q) >= 0;
       });
@@ -183,7 +261,9 @@
       const ready = state.farms.filter((f) => f.status === "ready").length;
       const gap = state.farms.filter((f) => f.status === "gap").length;
       const surveying = state.farms.filter((f) => f.surveyStatus === "in_progress" || f.surveyStatus === "assigned").length;
-      return { all, ready, gap, surveying };
+      const dup = state.farms.filter((f) => farmDupMatches(f).length).length;
+      const error = state.farms.filter((f) => farmErrors(f).length).length;
+      return { all, ready, gap, surveying, dup, error };
     },
     bySurveyStatus(st) {
       return state.farms.filter((f) => f.surveyStatus === st);
@@ -196,12 +276,14 @@
       const parsed = parseCsv(text);
       const mapping = autoMap(parsed.headers);
       const dups = detectDuplicates(parsed.rows, mapping, state.farms, state.master.coops);
+      const errors = detectFormatErrors(parsed.rows);
       state.importFile = {
         name: fileName || S.CSV_FILE_NAME,
         headers: parsed.headers,
         rows: parsed.rows,
         mapping,
         dups,
+        errors,
         step: 2
       };
       return state.importFile;
@@ -217,6 +299,7 @@
         state.farms,
         state.master.coops
       );
+      state.importFile.errors = detectFormatErrors(state.importFile.rows);
     },
     setDupAction(idx, action) {
       const d = state.importFile.dups.find((x) => x.idx === idx);
@@ -225,8 +308,10 @@
     applyImport() {
       const file = state.importFile;
       const created = [];
+      const skipErr = new Set((file.errors || []).map((e) => e.idx));
       file.dups.forEach((d) => {
         if (d.action === "skip") return;
+        if (skipErr.has(d.idx)) return;
         const farmName = api.mappedValue(d.row, file.mapping, "farm") || d.farmName;
         const farmer = api.mappedValue(d.row, file.mapping, "farmer") || d.farmer;
         const phone = api.mappedValue(d.row, file.mapping, "contact");
@@ -330,6 +415,7 @@
       const req = {
         id: "REQ-" + (state.requests.length + 1),
         ...data,
+        purposes: Object.assign({}, state.requestPurposes),
         createdAt: "2026-09-17"
       };
       state.requests.push(req);
@@ -340,15 +426,53 @@
     },
     generateDds(farmId) {
       const f = api.getFarm(farmId) || state.farms.find((x) => x.status === "ready");
+      const ship = state.ddsMode === "ship" ? (state.dispatches[0] || null) : null;
       const doc = {
         id: "DDS-2025-HUILA-00" + (state.ddsDocs.length + 1),
         farmId: f ? f.id : farmId,
         file: "DDS-2025-HUILA-00" + (state.ddsDocs.length + 1) + ".pdf",
-        createdAt: "2026-09-17 10:12"
+        createdAt: "2026-09-17 10:12",
+        basis: ship ? ("출하 " + ship.id + " · " + ship.period) : "조사 건"
       };
       state.ddsDocs.push(doc);
       state.selectedDdsId = doc.id;
       return doc;
+    },
+    generateArr(farmId) {
+      const f = api.getFarm(farmId) || state.farms.find((x) => x.status === "ready");
+      const doc = {
+        id: "ARR-2025-HUILA-00" + (state.arrDocs.length + 1),
+        farmId: f ? f.id : farmId,
+        file: "ARR-2025-HUILA-00" + (state.arrDocs.length + 1) + ".pdf",
+        createdAt: "2026-09-17 10:20",
+        note: "보완 2건은 한계로 표시 · 발급은 가능"
+      };
+      state.arrDocs.push(doc);
+      return doc;
+    },
+    addRosterFarm(data) {
+      const farm = api.addFarm({
+        name: data.name,
+        farmer: data.farmer,
+        phone: data.phone || "",
+        kg: "",
+        coopId: data.coopId || "COOP-001"
+      });
+      farm.source = "명부";
+      farm.surveyStatus = "new";
+      farm.assignee = null;
+      return farm;
+    },
+    addDelivery(data) {
+      const row = {
+        id: "DLV-" + (state.deliveries.length + 1),
+        date: data.date || "2026-09-17",
+        farm: data.farm,
+        kg: data.kg,
+        dest: data.dest || "Huila Coffee Processing Center"
+      };
+      state.deliveries.unshift(row);
+      return row;
     },
     approveReview(farmId) {
       const f = api.getFarm(farmId);

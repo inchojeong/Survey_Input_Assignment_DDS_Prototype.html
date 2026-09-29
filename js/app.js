@@ -84,10 +84,13 @@
 
   function gapChips(farm) {
     const gaps = Store.farmGaps(farm);
-    if (!gaps.length) {
-      return '<span class="b ok" title="DDS/EUDR 및 탄소 산정에 사용할 수 있습니다">필수정보 입력 완료</span>';
-    }
-    return gaps.map((g) => '<span class="b gap">' + escapeHtml(g) + "</span>").join(" ");
+    const extras = [];
+    if (Store.farmDupMatches(farm).length) extras.push('<span class="b bad">중복 후보</span>');
+    Store.farmErrors(farm).forEach((e) => extras.push('<span class="b bad">' + escapeHtml(e) + "</span>"));
+    const miss = gaps.length
+      ? gaps.map((g) => '<span class="b gap">' + escapeHtml(g) + "</span>").join(" ")
+      : '<span class="b ok" title="DDS/EUDR 및 탄소 산정에 사용할 수 있습니다">필수정보 입력 완료</span>';
+    return miss + (extras.length ? " " + extras.join(" ") : "");
   }
 
   function plotCount(farm) {
@@ -123,7 +126,7 @@
     $("imp-ex").innerHTML = exBox(["coopName", "farmName", "farmerName", "gps", "hsCode", "phone"], "샘플 CSV로 시연", "csv") +
       '<div class="exbox" style="margin-top:8px"><b>CSV 첫 줄 예</b><pre style="margin-top:6px;white-space:pre-wrap;font-size:11px;line-height:1.45">' +
       escapeHtml(S.CSV_TEXT.split("\n").slice(0, 3).join("\n")) +
-      "</pre><p class=" + '"hint" style="margin-top:6px">파일 선택 대신 위 버튼으로 Huila 4행을 바로 넣을 수 있습니다.</p></div>';
+      "</pre><p class=" + '"hint" style="margin-top:6px">파일 선택 대신 위 버튼으로 Huila 5행을 바로 넣을 수 있습니다. 마지막 한 행은 좌표 범위 오류 예시입니다.</p></div>';
 
     if (step === 1) {
       $("imp-filechip").classList.toggle("hide", !file.name);
@@ -184,6 +187,12 @@
           "<option value=\"skip\"" + (d.action === "skip" ? " selected" : "") + ">이번 등록에서 제외</option>" +
           "</select></td></tr>";
       }).join("");
+      const errs = file.errors || [];
+      $("imp-err-box").innerHTML = errs.length
+        ? "<b>형식 오류 " + errs.length + "건 · 등록에서 제외</b>" +
+          errs.map((e) => '<p class="hint" style="margin-top:6px">' +
+            escapeHtml((e.row.Farm || "") + " · " + e.errs.join(", ")) + "</p>").join("")
+        : '<p class="hint">형식 오류 행이 없습니다. 빈 칸은 다음 화면의 누락으로 남깁니다.</p>';
     }
 
     if (step === 4) {
@@ -202,7 +211,7 @@
 
   function loadSampleCsv() {
     Store.loadCsvText(S.CSV_TEXT, S.CSV_FILE_NAME);
-    toast("샘플 CSV 4행을 넣었습니다. Huila + Koboko 값입니다.");
+    toast("샘플 CSV 5행을 넣었습니다. Huila + Koboko 값이며, 1행은 좌표 범위 오류 예시입니다.");
     renderImport();
   }
 
@@ -238,6 +247,8 @@
     $("kpi-ready").textContent = c.ready;
     $("kpi-gap").textContent = c.gap;
     $("kpi-survey").textContent = c.surveying;
+    $("kpi-dup").textContent = c.dup;
+    $("kpi-error").textContent = c.error;
     $("complete-ex").innerHTML = exBox(["farmName", "phone", "gps", "kg"]);
 
     qsa("[data-cfilter]").forEach((b) => {
@@ -248,6 +259,8 @@
       if (b.dataset.cfilter === "gps") b.textContent = "위치정보 없음 " + gpsN;
       if (b.dataset.cfilter === "phone") b.textContent = "생산자 연락처 없음 " + phoneN;
       if (b.dataset.cfilter === "ready") b.textContent = "필수정보 입력 완료 " + c.ready;
+      if (b.dataset.cfilter === "dup") b.textContent = "중복 후보 " + c.dup;
+      if (b.dataset.cfilter === "error") b.textContent = "형식 오류 " + c.error;
     });
 
     $("complete-search").value = st.completeQuery;
@@ -319,7 +332,7 @@
       const checked = sv.id === st.selectedSurveyorId ? " checked" : "";
       const load = sv.load > 0 ? "현재 조사 " + sv.load + "건 진행 중" : "현재 배정 가능";
       return '<label class="choice' + on + '"><input type="radio" name="sv" value="' + sv.id + '"' + checked + "> " +
-        escapeHtml(sv.name) + ' <span class="hint">' + escapeHtml(sv.region) + " · " + load + "</span></label>";
+        escapeHtml(sv.name) + ' <span class="hint">' + escapeHtml(sv.region) + " · " + escapeHtml(sv.grade || "일반") + " · " + load + "</span></label>";
     }).join("");
   }
 
@@ -343,10 +356,17 @@
   /* ---------- 4 농장 ---------- */
   function renderFarm() {
     $("farm-ex").innerHTML = exBox(["farmName", "farmerName", "phone"], "새 농장 예시 채우기", "newfarm");
+    const tab = st.farmTab || "survey";
+    qsa("#farm-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.farmtab === tab));
     const exist = st.farmMode === "exist";
     qsa("#farm-seg button").forEach((b) => b.classList.toggle("on", b.dataset.mode === st.farmMode));
-    $("farm-exist").classList.toggle("hide", !exist);
-    $("farm-new").classList.toggle("hide", exist);
+    $("farm-seg").classList.toggle("hide", tab !== "survey");
+    $("farm-exist").classList.toggle("hide", tab !== "survey" || !exist);
+    $("farm-new").classList.toggle("hide", tab !== "survey" || exist);
+    $("farm-info").classList.toggle("hide", tab !== "info");
+    $("farm-submit").classList.toggle("hide", tab !== "submit");
+    $("farm-logs").classList.toggle("hide", tab !== "logs");
+    $("farm-go").textContent = tab === "logs" ? "납품 기록 저장" : (tab === "submit" ? "조사 화면으로" : "이 농장 조사 시작");
     $("farm-search").value = st.farmQuery;
     const q = st.farmQuery.trim().toLowerCase();
     const list = st.farms.filter((f) => {
@@ -361,6 +381,22 @@
         (f.lastSurvey ? " · 이전 조사 " + f.lastSurvey : " · 이전 조사 기록 없음") + "</div>" +
         '<div class="gaps" style="margin-top:6px">' + gapChips(f) + "</div></button>";
     }).join("") || '<p class="hint">검색 결과가 없습니다. 새 농장 등록에서 추가하세요.</p>';
+    const f = Store.getFarm(st.selectedFarmId);
+    $("farm-info").innerHTML = f
+      ? '<div class="keep"><b>등록된 농장정보</b><p class="hint" style="margin-top:6px">' +
+        escapeHtml(f.name) + " · " + escapeHtml(f.farmer) + "<br>연락처 " + escapeHtml(f.phone || "없음") +
+        "<br>소속 " + escapeHtml(f.coopId) + "</p><p class=\"hint\">기본정보는 여기서 바꾸지 않습니다.</p></div>"
+      : "";
+    $("farm-submit").innerHTML = f
+      ? '<p class="hint">위치·생산량을 채운 뒤 제출합니다. 아래 버튼으로 조사 화면으로 갑니다.</p><div class="gaps" style="margin-top:8px">' + gapChips(f) + "</div>"
+      : "";
+    $("farm-logs").innerHTML =
+      '<label class="f">오늘 납품량 (kg)</label><input class="in" id="log-kg" placeholder="예: 120">' +
+      '<p class="hint" style="margin-top:8px">가공·운송 상시 기록은 조합 화면과 탄소 화면에서도 같이 봅니다.</p>' +
+      (st.deliveries.slice(0, 4).map((d) =>
+        '<div class="li" style="cursor:default"><b>' + escapeHtml(d.farm) + "</b><div class=\"hint\">" +
+        d.date + " · " + d.kg + " kg → " + escapeHtml(d.dest) + "</div></div>"
+      ).join("") || '<p class="hint">납품 기록이 없습니다.</p>');
   }
 
   function fillNewFarm() {
@@ -372,6 +408,14 @@
   }
 
   function goSurveyFromFarm() {
+    if ((st.farmTab || "survey") === "logs") {
+      const f = Store.getFarm(st.selectedFarmId);
+      const kg = ($("log-kg") && $("log-kg").value.trim()) || "120";
+      Store.addDelivery({ farm: f ? f.name : "농장", kg: kg });
+      toast("납품 기록을 남겼습니다. 공급망 이력에서도 볼 수 있습니다.");
+      renderFarm();
+      return;
+    }
     if (st.farmMode === "new") {
       const name = $("nf-name").value.trim();
       const farmer = $("nf-farmer").value.trim();
@@ -402,6 +446,17 @@
     $("plot-year").value = f.harvestYear || "2025";
     $("plot-kg").value = f.kg || "";
     $("plot-kg").placeholder = "예: 1250";
+    $("plot-area").value = f.areaHa || "";
+    const calc = Store.calcAreaHa(f);
+    $("plot-area-calc").value = calc == null ? "경계 위치 3개 후 계산" : String(calc);
+    const entered = Number(f.areaHa);
+    if (f.areaHa && calc != null && entered > 0 && Math.abs(entered - calc) / entered > 0.3) {
+      $("plot-area-msg").innerHTML = '<span class="b bad">적어 넣은 면적과 경계 계산 면적이 많이 다릅니다. 경계를 다시 찍어 주세요.</span>';
+    } else if (calc != null) {
+      $("plot-area-msg").textContent = "경계로 계산한 면적과 입력 면적을 같이 확인합니다.";
+    } else {
+      $("plot-area-msg").textContent = "";
+    }
     $("plots").innerHTML = (f.plots.length ? f.plots : [{ id: "P1", points: [] }]).map((p, i) => {
       const n = (p.points || []).length;
       const badge = n >= 3
@@ -453,7 +508,8 @@
   function savePlot() {
     const f = Store.saveSurvey(st.selectedFarmId, {
       harvestYear: $("plot-year").value,
-      kg: $("plot-kg").value
+      kg: $("plot-kg").value,
+      areaHa: $("plot-area").value
     });
     if (!f) return;
     toast("조사를 제출했습니다. " + (f.status === "ready" ? "필수정보가 입력 완료되었습니다." : "관리자 검수를 기다립니다."));
@@ -491,7 +547,10 @@
       '<div class="node"><b>가공시설</b><span>' + escapeHtml(st.master.facilities[0].name) + "</span></div>" +
       '<div class="arr">↓</div>' +
       '<div class="node"><b>수출업체</b><span>' + escapeHtml(st.master.exporters[0].name) + "</span></div>";
-    $("req-gaps").innerHTML = '<span class="b warn">추가 확인 필요 · ' + gapN + '건</span><span class="b ok">중복 데이터 없음</span>';
+    $("req-gaps").innerHTML = '<span class="b warn">추가 확인 필요 · ' + gapN + '건</span><span class="b ok">중복 데이터 없음</span>' +
+      (st.requestPurposes.dds ? '<span class="b teal">DDS</span>' : "") +
+      (st.requestPurposes.carbon ? '<span class="b teal">탄소</span>' : "") +
+      (st.requestPurposes.trace ? '<span class="b teal">공급망</span>' : "");
   }
 
   function submitRequest() {
@@ -513,6 +572,11 @@
   /* ---------- 7 DDS ---------- */
   function renderDds() {
     $("dds-ex").innerHTML = exBox(["coopName", "hsCode", "gps"]);
+    qsa("#dds-mode button").forEach((b) => b.classList.toggle("on", b.dataset.ddsmode === st.ddsMode));
+    $("dds-ship").classList.toggle("hide", st.ddsMode !== "ship");
+    $("dds-dispatch").innerHTML = st.dispatches.map((d) =>
+      "<option value=\"" + d.id + "\">" + escapeHtml(d.id + " · " + d.lot + " · " + d.kg + " kg") + "</option>"
+    ).join("");
     const unique = st.farms.filter((f) => f.status === "ready" && (f.surveyStatus === "ready" || f.surveyStatus === "review"));
     if (!st.selectedDdsId || !unique.some((f) => f.id === st.selectedDdsId)) {
       st.selectedDdsId = unique[0] ? unique[0].id : "FARM-LALITPUR";
@@ -522,7 +586,11 @@
       return '<button class="li' + sel + '" type="button" data-dds="' + f.id + '"><b>' +
         escapeHtml(f.name) + '</b><div class="hint">' + escapeHtml(String(f.harvestYear || "")) +
         " · " + (f.status === "ready" ? "추가 조사 없이 생성 가능" : "관리자 검수 대기") + "</div></button>";
-    }).join("");
+    }).join("") + (st.ddsMode === "ship"
+      ? '<div class="keep" style="margin-top:8px"><b>출하 묶음</b><p class="hint">' +
+        escapeHtml((st.dispatches[0] && st.dispatches[0].farms) || "") + " · " +
+        escapeHtml((st.dispatches[0] && st.dispatches[0].period) || "") + "</p></div>"
+      : "");
 
     const f = Store.getFarm(st.selectedDdsId);
     const coop = st.master.coops[0];
@@ -553,13 +621,24 @@
     $("dds-done").classList.toggle("hide", !(last && last.farmId === st.selectedDdsId));
     if (last) {
       $("dds-file").textContent = last.file;
-      $("dds-when").textContent = last.createdAt + " · 이 문서는 생성 당시의 정보를 기준으로 저장됩니다. 이후 농장정보가 변경되어도 현재 문서의 내용은 유지됩니다.";
+      $("dds-when").textContent = last.createdAt + " · " + (last.basis || "조사 건") +
+        " · 이 문서는 생성 당시의 정보를 기준으로 저장됩니다. 이후 농장정보가 변경되어도 현재 문서의 내용은 유지됩니다.";
     }
+    $("dds-arr-list").innerHTML = st.arrDocs.map((d) =>
+      '<div class="li" style="cursor:default"><b>' + escapeHtml(d.file) + "</b><div class=\"hint\">" +
+      d.createdAt + " · " + escapeHtml(d.note) + "</div></div>"
+    ).join("") || '<p class="hint">아직 발급한 ARR이 없습니다.</p>';
   }
 
   function genDDS() {
     const doc = Store.generateDds(st.selectedDdsId);
     toast(doc.file + " 문서를 생성했습니다.");
+    renderDds();
+  }
+
+  function genArr() {
+    const doc = Store.generateArr(st.selectedDdsId);
+    toast(doc.file + " 을 발급했습니다. 보완 사항은 한계로 표시됩니다.");
     renderDds();
   }
 
@@ -612,6 +691,8 @@
       '<div class="card"><span>DDS/EUDR에 사용 가능</span><b style="color:#166534">' + c.ready + "</b></div>";
     const todos = [];
     if (c.gap) todos.push('<a class="li" href="#complete"><b>추가로 필요한 정보 ' + c.gap + "건</b><div class=\"hint\">빈 위치·연락처를 확인하고 조사원에게 배정합니다.</div></a>");
+    if (c.dup) todos.push('<a class="li" href="#complete"><b>중복 후보 ' + c.dup + "건</b><div class=\"hint\">같은 화면의 중복 후보 필터에서 확인합니다.</div></a>");
+    if (c.error) todos.push('<a class="li" href="#complete"><b>형식 오류 ' + c.error + "건</b><div class=\"hint\">좌표 범위·면적 차이를 같은 목록에서 봅니다.</div></a>");
     if (Store.bySurveyStatus("new").length) {
       todos.push('<a class="li" href="#assign"><b>배정 대기 ' + Store.bySurveyStatus("new").length + "건</b><div class=\"hint\">조사원을 고르고 현장조사를 보냅니다.</div></a>");
     }
@@ -638,7 +719,9 @@
       const pts = (f.plots || []).reduce((n, p) => n + (p.points || []).length, 0);
       return "<tr><td><b>" + escapeHtml(f.name) + "</b></td><td>" + escapeHtml(f.farmer) + "</td><td>" +
         escapeHtml(f.coopId) + "</td><td>" + (pts ? "위치 " + pts + "개" : "없음") + "</td><td>" +
-        statusBadge(f) + "</td><td><a href=\"#plot\" data-farm=\"" + f.id + "\">위치 확인</a></td></tr>";
+        statusBadge(f) +
+        (Store.farmDupMatches(f).length ? ' <span class="b bad">중복 후보</span>' : "") +
+        "</td><td><a href=\"#plot\" data-farm=\"" + f.id + "\">위치 확인</a></td></tr>";
     }).join("");
   }
 
@@ -679,11 +762,26 @@
       '<div class="ev"><b>' + escapeHtml(e.stage) + "</b> · " + escapeHtml(e.date) +
       '<div class="hint">' + escapeHtml(e.actor) + " · " + escapeHtml(e.detail) + "</div></div>"
     ).join("");
+    $("trace-ship").innerHTML =
+      "<p class=\"hint\">납품</p>" +
+      st.deliveries.map((d) =>
+        '<div class="li" style="cursor:default"><b>' + escapeHtml(d.farm) + "</b><div class=\"hint\">" +
+        d.date + " · " + d.kg + " kg → " + escapeHtml(d.dest) + "</div></div>"
+      ).join("") +
+      "<p class=\"hint\" style=\"margin-top:10px\">출하</p>" +
+      st.dispatches.map((d) =>
+        '<div class="li" style="cursor:default"><b>' + escapeHtml(d.lot) + "</b><div class=\"hint\">" +
+        d.date + " · " + d.kg + " kg · " + escapeHtml(d.farms) + "</div></div>"
+      ).join("");
   }
 
   /* ---------- 12 탄소 ---------- */
   function renderCarbon() {
     $("carbon-ex").innerHTML = exBox(["kwh", "wastewater", "diesel", "kg"], "Huila 예시 값으로 보기", "carbon");
+    $("carbon-scope").innerHTML =
+      '<span class="b teal">농가 단위 · 재배만</span> ' +
+      '<span class="b teal">조합 단위 · 재배·가공·운송</span> ' +
+      '<span class="hint">아래 합계는 조합(3단계) 예시입니다.</span>';
     const r = Store.carbonResult();
     const inp = st.carbonInput;
     $("carbon-kpi").innerHTML =
@@ -695,7 +793,11 @@
       "<tr><td>생산량</td><td>조사 결과</td><td>" + inp.harvestKg + " kg</td></tr>" +
       "<tr><td>가공 전력</td><td>공급망 · " + escapeHtml(inp.kwhHow) + "</td><td>" + Number(inp.kwh).toLocaleString() + " kWh</td></tr>" +
       "<tr><td>폐수량</td><td>" + escapeHtml(inp.wastewaterHow) + "</td><td>" + Number(inp.wastewaterL).toLocaleString() + " L</td></tr>" +
-      "<tr><td>운송 경유</td><td>" + escapeHtml(inp.route) + " · " + inp.distanceKm + " km</td><td>" + inp.dieselL + " L</td></tr>";
+      "<tr><td>운송 경유</td><td>" + escapeHtml(inp.route) + " · " + inp.distanceKm + " km</td><td>" + inp.dieselL + " L</td></tr>" +
+      st.procLogs.map((p) =>
+        "<tr><td>상시 기록 · " + escapeHtml(p.kind) + "</td><td>" + escapeHtml(p.actor) + " · " + p.date +
+        "</td><td>" + escapeHtml(p.detail) + "</td></tr>"
+      ).join("");
     $("carbon-ef").innerHTML =
       "<p><b>" + escapeHtml(r.elec.name) + "</b><br><span class=\"hint\">" + r.elec.value + " " + r.elec.unit + " · 버전 " + r.elec.version + "</span></p>" +
       "<p style=\"margin-top:8px\"><b>" + escapeHtml(r.dsl.name) + "</b><br><span class=\"hint\">" + r.dsl.value + " " + r.dsl.unit + " · 버전 " + r.dsl.version + "</span></p>";
@@ -732,7 +834,12 @@
       '<p class="hint">' + escapeHtml(e.satelliteSrc) + "</p>" +
       '<div class="mapbox" style="margin:10px 0"><div class="poly"></div></div>' +
       '<span class="b ok">' + escapeHtml(e.satelliteResult) + "</span>" +
-      '<p class="hint" style="margin-top:8px">' + escapeHtml(e.note) + "</p>";
+      '<p class="hint" style="margin-top:8px">' + escapeHtml(e.note) + "</p>" +
+      "<p class=\"hint\" style=\"margin-top:10px\">이전 분석</p>" +
+      (S.SATELLITE_RUNS || []).map((r) =>
+        '<div class="li" style="cursor:default"><b>' + escapeHtml(r.date) + "</b><div class=\"hint\">" +
+        escapeHtml(r.src) + " · " + escapeHtml(r.result) + "</div></div>"
+      ).join("");
     $("eudr-keep").innerHTML =
       '<div class="keep"><b>보관 상자</b><p class="hint">문서 생성 당시 위치·증빙·분석 결과가 묶여 2031-09-17까지 유지됩니다. 농장 기본정보를 고쳐도 이 묶음은 바뀌지 않습니다.</p>' +
       "<p>증빙사진 " + e.photos + "장 · DDS 문서 " + Math.max(1, st.ddsDocs.length) + "건</p></div>";
@@ -747,6 +854,9 @@
       return '<button class="li' + on + '" type="button" data-user="' + u.id + '">' +
         '<div class="bar"><b>' + escapeHtml(u.name) + "</b><span class=\"b teal\">" + escapeHtml(u.role) + "</span></div>" +
         '<div class="hint">' + escapeHtml(u.email) + "<br>" + escapeHtml(u.company) + "</div>" +
+        (u.purposes && u.purposes.length ? '<div class="gaps" style="margin-top:4px">' +
+          u.purposes.map((p) => '<span class="b teal">' + escapeHtml(p) + "</span>").join(" ") + "</div>" : "") +
+        (u.grade ? '<span class="b grey" style="margin-top:4px;display:inline-block">조사원 · ' + escapeHtml(u.grade) + "</span>" : "") +
         '<div class="hint" style="margin-top:4px">' + escapeHtml(u.sees) + "</div></button>";
     }).join("");
     const pack = Store.visibleFarmsForUser(cur);
@@ -921,6 +1031,12 @@
       st.farmMode = b.dataset.mode;
       renderFarm();
     });
+    $("farm-tabs").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-farmtab]");
+      if (!b) return;
+      st.farmTab = b.dataset.farmtab;
+      renderFarm();
+    });
     $("farm-search").addEventListener("input", (e) => {
       st.farmQuery = e.target.value;
       renderFarm();
@@ -958,9 +1074,19 @@
       const f = Store.getFarm(st.selectedFarmId);
       if (f) { f.kg = $("plot-kg").value; Store.refreshStatus(f); }
     });
+    $("plot-area").addEventListener("change", () => {
+      const f = Store.getFarm(st.selectedFarmId);
+      if (f) { f.areaHa = $("plot-area").value; renderPlot(); }
+    });
 
     $("req-submit").addEventListener("click", submitRequest);
     $("req-draft").addEventListener("click", () => toast("임시저장했습니다."));
+    $("req-purposes").addEventListener("change", (e) => {
+      const cb = e.target.closest("[data-purpose]");
+      if (!cb) return;
+      st.requestPurposes[cb.dataset.purpose] = cb.checked;
+      renderRequest();
+    });
 
     $("dds-list").addEventListener("click", (e) => {
       const b = e.target.closest("[data-dds]");
@@ -976,6 +1102,14 @@
       st.ddsDocs = [];
       genDDS();
     });
+    $("dds-mode").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-ddsmode]");
+      if (!b) return;
+      st.ddsMode = b.dataset.ddsmode;
+      renderDds();
+    });
+    $("dds-arr-gen").addEventListener("click", genArr);
+    $("dds-arr-gen2").addEventListener("click", genArr);
 
     document.addEventListener("click", (e) => {
       const b = e.target.closest("[data-exfill]");
@@ -1011,6 +1145,9 @@
     $("eudr-export").addEventListener("click", () => {
       toast("시연용이라 실제 EU 제출 파일은 없습니다. 위치·증빙·분석 결과를 한 상자로 묶는 순서만 보여 줍니다.");
     });
+    $("eudr-geojson").addEventListener("click", () => {
+      toast("시연용이라 실제 GeoJSON 파일은 없습니다. 농장 경계 좌표를 내려받는 자리입니다.");
+    });
     $("dash-todo").addEventListener("click", (e) => {
       const b = e.target.closest("[data-approve]");
       if (!b) return;
@@ -1023,6 +1160,19 @@
       if (!b) return;
       st.selectedFarmId = b.dataset.pickFarm;
       go("farm");
+    });
+    $("roster-add").addEventListener("click", () => {
+      const name = $("roster-name").value.trim();
+      const farmer = $("roster-farmer").value.trim();
+      if (!name || !farmer) {
+        toast("농장명과 생산자를 입력하세요.");
+        return;
+      }
+      Store.addRosterFarm({ name, farmer });
+      $("roster-name").value = "";
+      $("roster-farmer").value = "";
+      toast("명부에 농가를 추가했습니다. 위치는 나중에 현장에서 채웁니다.");
+      renderCoop();
     });
     $("master-tbody").addEventListener("click", (e) => {
       const a = e.target.closest("[data-farm]");

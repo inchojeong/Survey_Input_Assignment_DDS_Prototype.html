@@ -29,6 +29,7 @@
     "Cooperativa Cafetera de Huila,Finca El Roble,Carlos Mendoza,2.9273,-75.2819,090111,Decarbon Coffee Huila Green Coffee,2025,,CO,Huila",
     "Cooperativa Cafetera de Huila,Finca La Esperanza,Maria Gomez,,,090111,Decarbon Coffee Huila Green Coffee,2025,,CO,Huila",
     "Cooperativa Cafetera de Huila,Cooperativa Cafetera de Huila,(조합),2.9273,-75.2819,090111,Decarbon Coffee Huila Green Coffee,2025,+57 608 836 0000,CO,Huila",
+    "Cooperativa Cafetera de Huila,Finca Los Pinos,Ana Ruiz,120.5,-75.2819,090111,Decarbon Coffee Huila Green Coffee,2025,,CO,Huila",
     "Koboko Cooperative,Koboko cacao farm,Wan Song,3.4200,30.9600,180100,Koboko cacao,2024,,UG,Koboko"
   ].join("\n");
 
@@ -80,8 +81,8 @@
       }
     ],
     surveyors: [
-      { id: "SV-ALIKU", name: "Aliku William", region: "UG", load: 1 },
-      { id: "SV-HYUN", name: "이현우", region: "ET", load: 0 }
+      { id: "SV-ALIKU", name: "Aliku William", region: "UG", load: 1, grade: "리더" },
+      { id: "SV-HYUN", name: "이현우", region: "ET", load: 0, grade: "일반" }
     ]
   };
 
@@ -138,7 +139,8 @@
       surveyStatus: "ready",
       assignee: null,
       lastSurvey: "2025-11-18",
-      evidence: true
+      evidence: true,
+      areaHa: "12"
     },
     {
       id: "FARM-MAWA",
@@ -212,6 +214,24 @@
       assignee: "SV-HYUN",
       lastSurvey: "2026-05-29",
       evidence: false
+    },
+    {
+      id: "FARM-PINOS",
+      name: "Finca Los Pinos",
+      farmer: "Ana Ruiz",
+      coopId: "COOP-001",
+      country: "CO",
+      site: "Huila",
+      source: "파일",
+      phone: "",
+      harvestYear: 2025,
+      kg: "",
+      plots: [{ id: "P1", points: [{ lat: 120.5, lng: -75.2819 }] }],
+      status: "gap",
+      surveyStatus: "new",
+      assignee: null,
+      lastSurvey: null,
+      evidence: false
     }
   ];
 
@@ -273,9 +293,9 @@
   };
 
   const USERS = [
-    { id: "U-WAN", name: "Wan Song", email: "wan@songstark.com", role: "관리자", company: "키자니테이블", companyId: "ORG-KIJANIFY", sees: "모든 회사 데이터" },
-    { id: "U-CLI", name: "Maria Gomez", email: "perseverance220@gmail.com", role: "고객", company: "Cooperativa Cafetera de Huila", companyId: "COOP-001", sees: "자사 농가·조사만" },
-    { id: "U-HYUN", name: "이현우", email: "hyun@kijanify.demo", role: "조사원", company: "키자니테이블", companyId: "ORG-KIJANIFY", sees: "배정된 조사만" }
+    { id: "U-WAN", name: "Wan Song", email: "wan@songstark.com", role: "관리자", company: "키자니테이블", companyId: "ORG-KIJANIFY", sees: "모든 회사 데이터", purposes: ["전체"], grade: "" },
+    { id: "U-CLI", name: "Maria Gomez", email: "perseverance220@gmail.com", role: "고객", company: "Cooperativa Cafetera de Huila", companyId: "COOP-001", sees: "자사 농가·조사만", purposes: ["DDS", "공급망"], grade: "" },
+    { id: "U-HYUN", name: "이현우", email: "hyun@kijanify.demo", role: "조사원", company: "키자니테이블", companyId: "ORG-KIJANIFY", sees: "배정된 조사만", purposes: [], grade: "일반" }
   ];
 
   const NOTICES = [
@@ -288,6 +308,25 @@
     audience: "조사원",
     body: "Esperanza·El Roble 조사 시 토지 증빙사진을 2장 이상 찍어 주세요."
   };
+
+  const DELIVERIES = [
+    { id: "DLV-01", date: "2025-03-18", farm: "Finca La Esperanza", kg: 420, dest: "Huila Coffee Processing Center" },
+    { id: "DLV-02", date: "2025-03-22", farm: "Finca El Roble", kg: 380, dest: "Huila Coffee Processing Center" }
+  ];
+
+  const DISPATCHES = [
+    { id: "SHP-014", date: "2025-05-08", lot: "LOT-HC-2025-014", kg: 1180, farms: "Esperanza · El Roble", period: "2025-03 ~ 2025-05" }
+  ];
+
+  const PROC_LOGS = [
+    { date: "2025-03-20", kind: "가공", detail: "습식 가공 · 전력 13,200 kWh", actor: "Huila Coffee Processing Center" },
+    { date: "2025-05-06", kind: "운송", detail: "경유 180 L · Pitalito → Buenaventura", actor: "Colombia Green Coffee Export S.A.S." }
+  ];
+
+  const SATELLITE_RUNS = [
+    { date: "2026-02-10", src: "Hansen / JRC 예시", result: "산림 훼손 징후 없음" },
+    { date: "2025-08-02", src: "이전 분석 예시", result: "산림 훼손 징후 없음" }
+  ];
 
   global.KIJANIFY_SAMPLE = {
     EXAMPLES,
@@ -305,6 +344,10 @@
     EUDR_SAMPLE,
     USERS,
     NOTICES,
-    NOTICE_SAMPLE
+    NOTICE_SAMPLE,
+    DELIVERIES,
+    DISPATCHES,
+    PROC_LOGS,
+    SATELLITE_RUNS
   };
 })(window);
