@@ -11,12 +11,15 @@
 
   function farmGaps(farm) {
     const gaps = [];
-    if (!farm.phone) gaps.push("생산자 연락처 없음");
-    const pts = (farm.plots || []).reduce((n, p) => Math.max(n, (p.points || []).length), 0);
-    if (!farm.plots || !farm.plots.length) gaps.push("위치정보 없음");
-    else if (pts < 3) gaps.push("농장 경계 위치 " + (3 - pts) + "개 추가 필요");
-    if (farm.kg === "" || farm.kg === null || farm.kg === undefined) gaps.push("올해 생산량 입력 필요");
+    if (!farm.phone) gaps.push("연락처 없음");
+    const pts = locPts(farm);
+    if (pts < 3) gaps.push("위치 " + pts + "/3");
+    if (farm.kg === "" || farm.kg === null || farm.kg === undefined) gaps.push("생산량 없음");
     return gaps;
+  }
+
+  function locPts(farm) {
+    return (farm.plots || []).reduce((n, p) => Math.max(n, (p.points || []).length), 0);
   }
 
   function completeness(farm) {
@@ -171,8 +174,8 @@
     const errs = [];
     (farm.plots || []).forEach((p) => {
       (p.points || []).forEach((pt) => {
-        if (pt.lat < -90 || pt.lat > 90) errs.push("위도 범위 오류");
-        if (pt.lng < -180 || pt.lng > 180) errs.push("경도 범위 오류");
+        if (pt.lat < -90 || pt.lat > 90) errs.push("위도가 범위를 벗어남 (" + pt.lat + ")");
+        if (pt.lng < -180 || pt.lng > 180) errs.push("경도가 범위를 벗어남 (" + pt.lng + ")");
       });
     });
     if (farm.kg !== "" && farm.kg != null && isNaN(Number(farm.kg))) errs.push("생산량이 숫자가 아님");
@@ -180,7 +183,7 @@
     if (farm.areaHa && calc != null) {
       const entered = Number(farm.areaHa);
       if (entered > 0 && Math.abs(entered - calc) / entered > 0.3) {
-        errs.push("입력 면적과 경계 계산 면적 차이");
+        errs.push("입력 면적 " + entered + "ha와 경계 계산 " + calc + "ha가 크게 다름");
       }
     }
     return errs;
@@ -207,6 +210,7 @@
     viewAsUserId: "U-WAN",
     selectedNoticeId: "N-1",
     completeFilter: "gap",
+    completeSubfilter: "all",
     completeQuery: "",
     farmQuery: "",
     farmMode: "exist",
@@ -221,6 +225,7 @@
   const api = {
     state,
     farmGaps,
+    locPts,
     completeness,
     refreshStatus,
     parseCsv,
@@ -244,14 +249,22 @@
     },
     filteredFarms() {
       const q = state.completeQuery.trim().toLowerCase();
+      const filt = state.completeFilter;
+      const sub = state.completeSubfilter || "all";
       return state.farms.filter((f) => {
         const gaps = farmGaps(f);
-        if (state.completeFilter === "gap" && f.status !== "gap") return false;
-        if (state.completeFilter === "gps" && !gaps.some((g) => g.indexOf("위치정보") >= 0 || g.indexOf("농장 경계") >= 0)) return false;
-        if (state.completeFilter === "phone" && !gaps.includes("생산자 연락처 없음")) return false;
-        if (state.completeFilter === "ready" && f.status !== "ready") return false;
-        if (state.completeFilter === "dup" && !farmDupMatches(f).length) return false;
-        if (state.completeFilter === "error" && !farmErrors(f).length) return false;
+        if (filt === "gap") {
+          if (f.status !== "gap") return false;
+          if (sub === "gps" && locPts(f) >= 3) return false;
+          if (sub === "phone" && f.phone) return false;
+          if (sub === "kg" && f.kg !== "" && f.kg != null) return false;
+        } else if (filt === "error") {
+          if (!farmErrors(f).length) return false;
+        } else if (filt === "dup") {
+          if (!farmDupMatches(f).length) return false;
+        } else if (filt === "ready") {
+          if (f.status !== "ready") return false;
+        }
         if (!q) return true;
         return [f.name, f.farmer, f.coopId, gaps.join(" ")].join(" ").toLowerCase().indexOf(q) >= 0;
       });
@@ -259,11 +272,15 @@
     counts() {
       const all = state.farms.length;
       const ready = state.farms.filter((f) => f.status === "ready").length;
-      const gap = state.farms.filter((f) => f.status === "gap").length;
+      const gapFarms = state.farms.filter((f) => f.status === "gap");
+      const gap = gapFarms.length;
       const surveying = state.farms.filter((f) => f.surveyStatus === "in_progress" || f.surveyStatus === "assigned").length;
       const dup = state.farms.filter((f) => farmDupMatches(f).length).length;
       const error = state.farms.filter((f) => farmErrors(f).length).length;
-      return { all, ready, gap, surveying, dup, error };
+      const gps = gapFarms.filter((f) => locPts(f) < 3).length;
+      const phone = gapFarms.filter((f) => !f.phone).length;
+      const kg = gapFarms.filter((f) => f.kg === "" || f.kg === null || f.kg === undefined).length;
+      return { all, ready, gap, surveying, dup, error, gps, phone, kg };
     },
     bySurveyStatus(st) {
       return state.farms.filter((f) => f.surveyStatus === st);
