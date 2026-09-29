@@ -89,27 +89,18 @@
     return gaps.map((g) => '<span class="b gap">' + escapeHtml(g) + "</span>").join(" ");
   }
 
-  function issueChips(farm, filt) {
-    if (filt === "error") {
-      const errs = Store.farmErrors(farm);
-      return errs.map((e) => '<span class="b bad">' + escapeHtml(e) + "</span>").join(" ") ||
-        '<span class="hint">형식 오류 없음</span>';
-    }
-    if (filt === "dup") {
-      const hits = Store.farmDupMatches(farm);
-      if (!hits.length) return '<span class="hint">중복 후보 아님</span>';
-      return hits.map((h) => {
-        if (h.kind === "coop") return '<span class="b dup">조합명과 같음 · 연결 여부 확인</span>';
-        return '<span class="b dup">' + escapeHtml(h.other.name) + "와 이름 유사 · 연결 여부 확인</span>";
-      }).join(" ");
-    }
-    if (filt === "ready") {
-      const extra = [];
-      if (Store.farmDupMatches(farm).length) extra.push('<span class="b dup">중복 후보</span>');
-      if (Store.farmErrors(farm).length) extra.push('<span class="b bad">형식 오류도 있음</span>');
-      return '<span class="b ok">필수정보 입력 완료</span>' + (extra.length ? " " + extra.join(" ") : "");
-    }
-    return gapChips(farm);
+  function otherIssueHint(farm, current) {
+    const bits = [];
+    if (current !== "gap" && Store.farmGapItems(farm).length) bits.push("누락");
+    if (current !== "error" && Store.farmErrorItems(farm).length) bits.push("형식 오류");
+    if (current !== "dup" && Store.farmDupItems(farm).length) bits.push("중복");
+    if (!bits.length) return "";
+    return '<div class="hint">같은 농장에 ' + bits.join(" · ") + "도 있습니다. 해당 색 판에서 따로 봅니다.</div>";
+  }
+
+  function farmCell(farm) {
+    return "<b>" + escapeHtml(farm.name) + "</b><div class=\"hint\">" +
+      escapeHtml(farm.farmer) + " · " + escapeHtml(sourceLabel(farm.source)) + " · " + plotCount(farm) + "</div>";
   }
 
   function nextAction(farm, filt) {
@@ -284,19 +275,53 @@
   /* ---------- 2 완성도 ---------- */
   function renderComplete() {
     const c = Store.counts();
-    const filt = st.completeFilter || "gap";
+    const filt = st.completeFilter || "all";
     const sub = st.completeSubfilter || "all";
     $("kpi-ready").textContent = c.ready;
     $("kpi-gap").textContent = c.gap;
     $("kpi-dup").textContent = c.dup;
     $("kpi-error").textContent = c.error;
+    $("board-gap-n").textContent = c.gap;
+    $("board-error-n").textContent = c.error;
+    $("board-dup-n").textContent = c.dup;
+    $("board-ready-n").textContent = c.ready;
 
     qsa("#complete-kpi [data-cfilter]").forEach((b) => {
-      const on = b.dataset.cfilter === filt;
-      b.classList.toggle("on", on);
-      b.classList.toggle("warn", b.dataset.cfilter === "gap" && on);
+      b.classList.toggle("on", filt !== "all" && b.dataset.cfilter === filt);
     });
-    $("complete-sub").classList.toggle("hide", filt !== "gap");
+    ["gap", "error", "dup", "ready"].forEach((kind) => {
+      $("board-" + kind).classList.toggle("hide", filt !== "all" && filt !== kind);
+    });
+
+    $("complete-tax").innerHTML =
+      '<article class="tax gap"><div class="tax-k">유형 1 · 누락</div><b>칸이 비어 있음</b>' +
+      "<p>채울 값이 없습니다. 틀린 값이 아닙니다.</p><div class=\"kinds\">" +
+      '<span class="b gap">연락처 없음 ' + c.phone + "</span>" +
+      '<span class="b gap">위치 부족 ' + c.gps + "</span>" +
+      '<span class="b gap">생산량 없음 ' + c.kg + "</span></div>" +
+      '<p class="tax-next">다음에 할 일 · 조사원에게 배정해서 현장에서 채움</p></article>' +
+      '<article class="tax error"><div class="tax-k">유형 2 · 형식 오류</div><b>값은 있는데 틀림</b>' +
+      "<p>빈 칸이 아니라, 허용 범위를 벗어난 값입니다.</p><div class=\"kinds\">" +
+      '<span class="b bad">좌표 범위 ' + c.lat + "</span>" +
+      '<span class="b bad">면적 불일치 ' + c.area + "</span>" +
+      '<span class="b bad">숫자 아님 ' + c.kgnum + "</span></div>" +
+      '<p class="tax-next">다음에 할 일 · 잘못된 값을 고침 · 현장 배정 아님</p></article>' +
+      '<article class="tax dup"><div class="tax-k">유형 3 · 중복</div><b>같은 대상으로 보임</b>' +
+      "<p>이미 있는 농장·조합과 이름이 같아 연결 여부를 고릅니다.</p><div class=\"kinds\">" +
+      '<span class="b dup">조합명과 같음 ' + c.dupCoop + "</span>" +
+      '<span class="b dup">농장명 유사 ' + c.dupFarm + "</span></div>" +
+      '<p class="tax-next">다음에 할 일 · 기존에 연결할지, 새 건으로 둘지 확인</p></article>';
+
+    const hints = {
+      all: "세 유형을 색이 다른 판으로 같이 봅니다. 한 농장이 여러 판에 나올 수 있습니다.",
+      gap: "누락만 봅니다. 빠진 칸이 있는 건입니다. 선택한 건만 조사원에게 배정합니다.",
+      error: "형식 오류만 봅니다. 값이 잘못된 건입니다. 빈 칸이 아니라 틀린 값을 고칩니다.",
+      dup: "중복만 봅니다. 이미 있는 정보와 같아 보이는 건입니다. 연결 여부를 확인합니다.",
+      ready: "필수정보가 채워진 건입니다. 오류·중복이 남아 있으면 위 판에서 따로 처리합니다."
+    };
+    $("complete-view-hint").textContent = "전체 " + c.all + "곳 · " + (hints[filt] || hints.all);
+    $("complete-search").value = st.completeQuery;
+
     qsa("#complete-sub [data-csub]").forEach((b) => {
       b.className = "btn " + (b.dataset.csub === sub ? "p" : "g");
       if (b.dataset.csub === "all") b.textContent = "전체 누락 " + c.gap;
@@ -305,67 +330,84 @@
       if (b.dataset.csub === "kg") b.textContent = "생산량 없음 " + c.kg;
     });
 
-    if (filt === "error") {
-      $("complete-ex").innerHTML = '<div class="exbox"><div class="bar"><b>형식 오류란</b></div>' +
-        "<div>값은 있는데 모양이 틀린 칸입니다. 올바른 좌표 예: <code>2.9273, -75.2819</code> · 위도 120은 오류입니다. 생산량은 숫자만. 입력 면적과 경계 계산 면적이 많이 다르면 오류입니다.</div></div>";
-    } else if (filt === "dup") {
-      $("complete-ex").innerHTML = '<div class="exbox"><div class="bar"><b>중복 후보란</b></div>' +
-        "<div>이미 있는 농장·조합과 이름이 같아, 같은 대상으로 보이는 건입니다. 연결할지 새 건으로 둘지 고릅니다. 빈 칸을 채우는 일과 다릅니다.</div></div>";
-    } else if (filt === "ready") {
-      $("complete-ex").innerHTML = '<div class="exbox"><div class="bar"><b>필수정보 입력 완료</b></div>' +
-        "<div>연락처·위치 3개·생산량이 채워져 DDS/EUDR 문서와 탄소 산정에 넣을 수 있습니다. 추가 조사 없이 문서로 이동합니다.</div></div>";
-    } else {
-      $("complete-ex").innerHTML = exBox(["phone", "gps", "kg"]);
-    }
-
-    const hints = {
-      gap: "빠진 칸이 있는 건입니다. 선택한 건만 조사원에게 배정합니다.",
-      error: "값이 잘못된 건입니다. 빈 칸이 아니라 틀린 값을 고칩니다.",
-      dup: "이미 있는 정보와 같아 보이는 건입니다. 연결 여부를 확인합니다.",
-      ready: "문서에 넣을 수 있는 건입니다. 배정하지 않습니다."
-    };
-    $("complete-view-hint").textContent = "전체 " + c.all + "곳 · " + (hints[filt] || "");
-    $("complete-search").value = st.completeQuery;
-
-    const assignable = filt === "gap";
-    $("complete-assign").classList.toggle("hide", !assignable);
-    $("complete-selected").classList.toggle("hide", !assignable);
-
-    const rows = Store.filteredFarms();
-    const visibleSel = rows.filter((f) => selected.has(f.id) && f.status === "gap").length;
+    const gapRows = Store.farmsByIssue("gap");
+    const visibleSel = gapRows.filter((f) => selected.has(f.id)).length;
     $("complete-selected").textContent = visibleSel + "건 선택됨";
     $("complete-assign").textContent = "선택한 " + visibleSel + "건을 조사원에게 배정";
 
-    const empty = $("complete-empty");
-    if (!rows.length) {
-      empty.classList.remove("hide");
-      if (filt === "error") {
-        empty.innerHTML = "<b>지금 고칠 형식 오류는 없습니다.</b>" +
-          '<p class="hint" style="margin-top:6px">값이 잘못된 건이 아니라, 아직 안 채운 칸은 위 <b>누락 · 빠진 칸</b>에서 봅니다. 오류의 예: 위도가 -90~90을 벗어남, 생산량이 숫자가 아님, 입력 면적과 경계 면적이 크게 다름.</p>';
-      } else if (filt === "dup") {
-        empty.innerHTML = "<b>지금 확인할 중복 후보는 없습니다.</b>" +
-          '<p class="hint" style="margin-top:6px">이름이 조합·기존 농장과 같으면 여기에 모입니다. 빠진 칸은 <b>누락</b>에서 봅니다.</p>';
+    function setEmpty(id, rows, html) {
+      const el = $(id);
+      if (!rows.length) {
+        el.classList.remove("hide");
+        el.innerHTML = html;
       } else {
-        empty.innerHTML = '<p class="hint">조건에 맞는 농장이 없습니다.</p>';
+        el.classList.add("hide");
+        el.innerHTML = "";
       }
-    } else {
-      empty.classList.add("hide");
-      empty.innerHTML = "";
     }
+    setEmpty("empty-gap", gapRows, '<p class="hint">빠진 칸이 있는 농장이 없습니다.</p>');
+    const errRows = Store.farmsByIssue("error");
+    setEmpty("empty-error", errRows,
+      "<b>지금 고칠 형식 오류는 없습니다.</b>" +
+      '<p class="hint" style="margin-top:6px">값이 잘못된 건이 아니라, 아직 안 채운 칸은 주황 <b>누락</b> 판에서 봅니다.</p>');
+    const dupRows = Store.farmsByIssue("dup");
+    setEmpty("empty-dup", dupRows,
+      "<b>지금 확인할 중복 후보는 없습니다.</b>" +
+      '<p class="hint" style="margin-top:6px">이름이 조합·기존 농장과 같으면 보라 판에 모입니다.</p>');
+    const readyRows = Store.farmsByIssue("ready");
+    setEmpty("empty-ready", readyRows, '<p class="hint">필수정보가 채워진 농장이 없습니다.</p>');
 
-    $("complete-tbody").innerHTML = rows.map((f) => {
-      const canSel = assignable && f.status === "gap";
-      const checked = canSel && selected.has(f.id) ? " checked" : "";
-      const box = canSel
-        ? '<input type="checkbox" data-sel="' + f.id + '"' + checked + ">"
-        : '<span class="hint">—</span>';
+    $("tbody-gap").innerHTML = gapRows.map((f) => {
+      const checked = selected.has(f.id) ? " checked" : "";
+      const items = Store.farmGapItems(f);
       return '<tr class="clickable" data-farm="' + f.id + '">' +
-        "<td>" + box + "</td>" +
-        "<td><b>" + escapeHtml(f.name) + "</b><div class=\"hint\">" +
-        escapeHtml(f.farmer) + " · " + escapeHtml(f.coopId) + " · " + plotCount(f) + "</div></td>" +
-        '<td><span class="b grey">' + escapeHtml(sourceLabel(f.source)) + "</span></td>" +
-        "<td>" + issueChips(f, filt) + "</td>" +
-        "<td>" + nextAction(f, filt) + "</td></tr>";
+        '<td><input type="checkbox" data-sel="' + f.id + '"' + checked + "></td>" +
+        "<td>" + farmCell(f) + otherIssueHint(f, "gap") + "</td>" +
+        "<td><div class=\"prob\">" + items.map((i) =>
+          '<span class="b gap">' + escapeHtml(i.title) + "</span>" +
+          '<span class="hint">' + escapeHtml(i.detail) + "</span>"
+        ).join("") + "</div></td>" +
+        "<td>" + nextAction(f, "gap") + "</td></tr>";
+    }).join("");
+
+    $("tbody-error").innerHTML = errRows.map((f) => {
+      const items = Store.farmErrorItems(f);
+      return '<tr class="clickable" data-farm="' + f.id + '">' +
+        "<td>" + farmCell(f) + otherIssueHint(f, "error") + "</td>" +
+        "<td><div class=\"prob\">" + items.map((i) =>
+          '<span class="b bad">' + escapeHtml(i.title) + "</span>" +
+          '<div>입력 <span class="got">' + escapeHtml(i.value || "") + "</span></div>"
+        ).join("") + "</div></td>" +
+        "<td><div class=\"prob\">" + items.map((i) =>
+          '<span class="hint">허용 ' + escapeHtml(i.expect || "") + "</span>" +
+          (i.example ? '<div>예 <span class="okv">' + escapeHtml(i.example) + "</span></div>" : "")
+        ).join("") + "</div></td>" +
+        "<td>" + nextAction(f, "error") + "</td></tr>";
+    }).join("");
+
+    $("tbody-dup").innerHTML = dupRows.map((f) => {
+      const items = Store.farmDupItems(f);
+      return '<tr class="clickable" data-farm="' + f.id + '">' +
+        "<td>" + farmCell(f) + otherIssueHint(f, "dup") + "</td>" +
+        "<td><div class=\"prob\">" + items.map((i) =>
+          '<span class="b dup">' + escapeHtml(i.title) + "</span>" +
+          "<div><b>" + escapeHtml(i.target) + "</b></div>"
+        ).join("") + "</div></td>" +
+        "<td><div class=\"prob\">" + items.map((i) =>
+          '<span class="hint">' + escapeHtml(i.reason) + " · 일치 " + i.score + "%</span>"
+        ).join("") + "</div></td>" +
+        "<td>" + nextAction(f, "dup") + "</td></tr>";
+    }).join("");
+
+    $("tbody-ready").innerHTML = readyRows.map((f) => {
+      const extra = [];
+      if (Store.farmErrorItems(f).length) extra.push('<span class="b bad">형식 오류 있음</span>');
+      if (Store.farmDupItems(f).length) extra.push('<span class="b dup">중복 후보</span>');
+      return '<tr class="clickable" data-farm="' + f.id + '">' +
+        "<td>" + farmCell(f) + "</td>" +
+        '<td><span class="b ok">필수정보 입력 완료</span></td>' +
+        "<td>" + (extra.join(" ") || '<span class="hint">다른 유형 없음</span>') + "</td>" +
+        "<td>" + nextAction(f, "ready") + "</td></tr>";
     }).join("");
   }
 
@@ -1070,7 +1112,7 @@
     $("complete-kpi").addEventListener("click", (e) => {
       const b = e.target.closest("[data-cfilter]");
       if (!b) return;
-      st.completeFilter = b.dataset.cfilter;
+      st.completeFilter = st.completeFilter === b.dataset.cfilter ? "all" : b.dataset.cfilter;
       st.completeSubfilter = "all";
       renderComplete();
     });
@@ -1080,7 +1122,7 @@
       st.completeSubfilter = b.dataset.csub;
       renderComplete();
     });
-    $("complete-tbody").addEventListener("change", (e) => {
+    $("tbody-gap").addEventListener("change", (e) => {
       const cb = e.target.closest("[data-sel]");
       if (!cb) return;
       if (cb.checked) selected.add(cb.dataset.sel);

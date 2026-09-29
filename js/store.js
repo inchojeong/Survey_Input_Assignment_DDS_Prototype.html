@@ -9,13 +9,29 @@
     return JSON.parse(JSON.stringify(v));
   }
 
-  function farmGaps(farm) {
-    const gaps = [];
-    if (!farm.phone) gaps.push("연락처 없음");
+  function farmGapItems(farm) {
+    const items = [];
+    if (!farm.phone) {
+      items.push({ code: "phone", title: "연락처 없음", detail: "전화·메일이 비어 있습니다." });
+    }
     const pts = locPts(farm);
-    if (pts < 3) gaps.push("위치 " + pts + "/3");
-    if (farm.kg === "" || farm.kg === null || farm.kg === undefined) gaps.push("생산량 없음");
-    return gaps;
+    if (pts < 3) {
+      items.push({
+        code: "gps",
+        title: "위치 " + pts + "/3",
+        detail: pts === 0
+          ? "경계 점이 없습니다. 3개가 필요합니다."
+          : "경계 점 " + pts + "개입니다. 3개가 필요합니다."
+      });
+    }
+    if (farm.kg === "" || farm.kg === null || farm.kg === undefined) {
+      items.push({ code: "kg", title: "생산량 없음", detail: "올해 수확량(kg)이 비어 있습니다." });
+    }
+    return items;
+  }
+
+  function farmGaps(farm) {
+    return farmGapItems(farm).map((i) => i.title);
   }
 
   function locPts(farm) {
@@ -170,23 +186,78 @@
     return hits;
   }
 
-  function farmErrors(farm) {
-    const errs = [];
+  function farmErrorItems(farm) {
+    const items = [];
     (farm.plots || []).forEach((p) => {
       (p.points || []).forEach((pt) => {
-        if (pt.lat < -90 || pt.lat > 90) errs.push("위도가 범위를 벗어남 (" + pt.lat + ")");
-        if (pt.lng < -180 || pt.lng > 180) errs.push("경도가 범위를 벗어남 (" + pt.lng + ")");
+        if (pt.lat < -90 || pt.lat > 90) {
+          items.push({
+            code: "lat",
+            title: "위도 범위 오류",
+            value: String(pt.lat),
+            expect: "-90 ~ 90",
+            example: "2.9273"
+          });
+        }
+        if (pt.lng < -180 || pt.lng > 180) {
+          items.push({
+            code: "lng",
+            title: "경도 범위 오류",
+            value: String(pt.lng),
+            expect: "-180 ~ 180",
+            example: "-75.2819"
+          });
+        }
       });
     });
-    if (farm.kg !== "" && farm.kg != null && isNaN(Number(farm.kg))) errs.push("생산량이 숫자가 아님");
+    if (farm.kg !== "" && farm.kg != null && isNaN(Number(farm.kg))) {
+      items.push({
+        code: "kgnum",
+        title: "생산량이 숫자가 아님",
+        value: String(farm.kg),
+        expect: "숫자(kg)",
+        example: "860"
+      });
+    }
     const calc = calcAreaHa(farm);
     if (farm.areaHa && calc != null) {
       const entered = Number(farm.areaHa);
       if (entered > 0 && Math.abs(entered - calc) / entered > 0.3) {
-        errs.push("입력 면적 " + entered + "ha와 경계 계산 " + calc + "ha가 크게 다름");
+        items.push({
+          code: "area",
+          title: "면적 불일치",
+          value: entered + "ha",
+          expect: "경계 계산 " + calc + "ha",
+          example: "차이 30% 이내"
+        });
       }
     }
-    return errs;
+    return items;
+  }
+
+  function farmErrors(farm) {
+    return farmErrorItems(farm).map((i) => i.title + (i.value ? " (" + i.value + ")" : ""));
+  }
+
+  function farmDupItems(farm) {
+    return farmDupMatches(farm).map((h) => {
+      if (h.kind === "coop") {
+        return {
+          code: "coop",
+          title: "조합명과 같음",
+          target: h.other.name,
+          reason: "농장 이름이 협동조합 이름과 같습니다.",
+          score: h.score
+        };
+      }
+      return {
+        code: "farm",
+        title: "농장명 유사",
+        target: h.other.name,
+        reason: "이미 있는 농장과 이름 또는 생산자가 같습니다.",
+        score: h.score
+      };
+    });
   }
 
   const state = {
@@ -209,7 +280,7 @@
     procLogs: clone(S.PROC_LOGS),
     viewAsUserId: "U-WAN",
     selectedNoticeId: "N-1",
-    completeFilter: "gap",
+    completeFilter: "all",
     completeSubfilter: "all",
     completeQuery: "",
     farmQuery: "",
@@ -225,6 +296,7 @@
   const api = {
     state,
     farmGaps,
+    farmGapItems,
     locPts,
     completeness,
     refreshStatus,
@@ -234,7 +306,9 @@
     detectFormatErrors,
     emptyCells,
     farmDupMatches,
+    farmDupItems,
     farmErrors,
+    farmErrorItems,
     calcAreaHa,
     getFarm(id) {
       return state.farms.find((f) => f.id === id);
@@ -247,27 +321,33 @@
       const s = state.master.surveyors.find((x) => x.id === id);
       return s ? s.name : "";
     },
-    filteredFarms() {
+    farmsByIssue(kind) {
       const q = state.completeQuery.trim().toLowerCase();
-      const filt = state.completeFilter;
       const sub = state.completeSubfilter || "all";
       return state.farms.filter((f) => {
-        const gaps = farmGaps(f);
-        if (filt === "gap") {
-          if (f.status !== "gap") return false;
+        const gaps = farmGapItems(f);
+        if (kind === "gap") {
+          if (!gaps.length) return false;
           if (sub === "gps" && locPts(f) >= 3) return false;
           if (sub === "phone" && f.phone) return false;
           if (sub === "kg" && f.kg !== "" && f.kg != null) return false;
-        } else if (filt === "error") {
-          if (!farmErrors(f).length) return false;
-        } else if (filt === "dup") {
-          if (!farmDupMatches(f).length) return false;
-        } else if (filt === "ready") {
+        } else if (kind === "error") {
+          if (!farmErrorItems(f).length) return false;
+        } else if (kind === "dup") {
+          if (!farmDupItems(f).length) return false;
+        } else if (kind === "ready") {
           if (f.status !== "ready") return false;
         }
         if (!q) return true;
-        return [f.name, f.farmer, f.coopId, gaps.join(" ")].join(" ").toLowerCase().indexOf(q) >= 0;
+        return [f.name, f.farmer, f.coopId, gaps.map((g) => g.title).join(" ")].join(" ").toLowerCase().indexOf(q) >= 0;
       });
+    },
+    filteredFarms() {
+      const filt = state.completeFilter || "all";
+      if (filt === "all" || filt === "error" || filt === "dup" || filt === "ready") {
+        return api.farmsByIssue("gap");
+      }
+      return api.farmsByIssue(filt);
     },
     counts() {
       const all = state.farms.length;
@@ -275,12 +355,17 @@
       const gapFarms = state.farms.filter((f) => f.status === "gap");
       const gap = gapFarms.length;
       const surveying = state.farms.filter((f) => f.surveyStatus === "in_progress" || f.surveyStatus === "assigned").length;
-      const dup = state.farms.filter((f) => farmDupMatches(f).length).length;
-      const error = state.farms.filter((f) => farmErrors(f).length).length;
+      const dup = state.farms.filter((f) => farmDupItems(f).length).length;
+      const error = state.farms.filter((f) => farmErrorItems(f).length).length;
       const gps = gapFarms.filter((f) => locPts(f) < 3).length;
       const phone = gapFarms.filter((f) => !f.phone).length;
       const kg = gapFarms.filter((f) => f.kg === "" || f.kg === null || f.kg === undefined).length;
-      return { all, ready, gap, surveying, dup, error, gps, phone, kg };
+      const lat = state.farms.filter((f) => farmErrorItems(f).some((i) => i.code === "lat" || i.code === "lng")).length;
+      const area = state.farms.filter((f) => farmErrorItems(f).some((i) => i.code === "area")).length;
+      const kgnum = state.farms.filter((f) => farmErrorItems(f).some((i) => i.code === "kgnum")).length;
+      const dupCoop = state.farms.filter((f) => farmDupItems(f).some((i) => i.code === "coop")).length;
+      const dupFarm = state.farms.filter((f) => farmDupItems(f).some((i) => i.code === "farm")).length;
+      return { all, ready, gap, surveying, dup, error, gps, phone, kg, lat, area, kgnum, dupCoop, dupFarm };
     },
     bySurveyStatus(st) {
       return state.farms.filter((f) => f.surveyStatus === st);
