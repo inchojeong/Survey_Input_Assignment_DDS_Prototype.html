@@ -129,7 +129,11 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .kpi button.card.pick.on[data-cfilter="ready"]{outline-color:#166534}
 .b.dup{background:#f3e8ff;color:var(--dup)}
 .tax3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.tax{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;border-top:5px solid}
+.sec-label{font-size:13px;font-weight:800;margin:14px 0 8px}
+.tax{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;border-top:5px solid;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+.tax.on{outline:2px solid #c2410c}
+.tax.error.on{outline-color:#9f1239}
+.tax.dup.on{outline-color:#6b21a8}
 .tax.gap{border-top-color:#c2410c;background:#fff7ed}
 .tax.error{border-top-color:#9f1239;background:#fff1f2}
 .tax.dup{border-top-color:var(--dup);background:var(--dup-l)}
@@ -461,70 +465,71 @@ tr.clickable:hover td{background:#f8fafc}
     <main>
       <div class="top">
         <div class="crumb">정보 누락 확인</div>
-        <h1>농장정보 누락 현황</h1>
+        <h1>데이터 검증</h1>
         <div class="sp"></div>
         <div class="search"><input id="complete-search" placeholder="농장, 조합  예: Esperanza"></div>
       </div>
       <div class="page">
-        <div class="delta">데이터 문제는 <b>누락 · 형식 오류 · 중복</b> 세 축입니다. 한 농장에 여러 유형이 같이 있을 수 있어, 아래에서는 유형을 섞지 않고 따로 보여 줍니다. 카드를 누르면 그 유형만 크게 보고, 다시 누르면 세 유형을 같이 봅니다.</div>
+        <div class="delta">등록된 데이터를 <b>누락 · 오류 · 중복</b> 세 가지 유형으로 나누어 확인합니다. 한 농장에 여러 문제가 동시에 있을 수 있습니다. 유형 카드를 선택하면 해당 문제만 확인할 수 있으며, 다시 선택하면 전체 유형을 함께 볼 수 있습니다.</div>
         <div class="tax3" id="complete-tax"></div>
+        <div class="sec-label">전체 검증 현황</div>
         <div class="kpi kpi4" id="complete-kpi">
-          <button class="card pick" type="button" data-cfilter="gap"><span>누락 · 빠진 칸</span><b id="kpi-gap" style="color:#c2410c">0</b></button>
-          <button class="card pick" type="button" data-cfilter="error"><span>형식 오류 · 값이 틀림</span><b id="kpi-error" style="color:#9f1239">0</b></button>
-          <button class="card pick" type="button" data-cfilter="dup"><span>중복 후보 · 연결 확인</span><b id="kpi-dup" style="color:#6b21a8">0</b></button>
-          <button class="card pick" type="button" data-cfilter="ready"><span>필수정보 입력 완료</span><b id="kpi-ready" style="color:#166534">0</b></button>
+          <button class="card pick" type="button" data-cfilter="gap"><span>누락 · 입력되지 않은 정보</span><b id="kpi-gap" style="color:#c2410c">0</b></button>
+          <button class="card pick" type="button" data-cfilter="error"><span>형식 오류 · 수정이 필요한 값</span><b id="kpi-error" style="color:#9f1239">0</b></button>
+          <button class="card pick" type="button" data-cfilter="dup"><span>중복 후보 · 연결 여부 확인 필요</span><b id="kpi-dup" style="color:#6b21a8">0</b></button>
+          <button class="card pick" type="button" data-cfilter="ready"><span>필수정보 완료 · 필수값 입력 완료</span><b id="kpi-ready" style="color:#166534">0</b></button>
         </div>
         <p class="hint" id="complete-view-hint"></p>
         <div class="issue-boards" id="complete-boards">
           <section class="issue-board kind-gap" id="board-gap">
-            <div class="board-hd"><div><strong>누락</strong><span>칸이 비어 있음 · <span id="board-gap-n">0</span>곳</span></div><span>다음에 할 일 · 현장에서 채움</span></div>
+            <div class="board-hd"><div><strong>누락</strong><span>필수 정보가 입력되지 않은 농장 · <span id="board-gap-n">0</span>곳</span></div><span>누락된 정보를 확인하고 필요한 경우 현장 조사로 보완합니다.</span></div>
             <div class="board-bd">
               <div class="bar" id="complete-sub" style="margin-bottom:8px">
-                <span class="hint">누락 안에서</span>
+                <span class="hint">누락 유형</span>
                 <button class="btn p" type="button" data-csub="all">전체 누락</button>
-                <button class="btn g" type="button" data-csub="gps">위치 부족</button>
-                <button class="btn g" type="button" data-csub="phone">연락처 없음</button>
-                <button class="btn g" type="button" data-csub="kg">생산량 없음</button>
+                <button class="btn g" type="button" data-csub="gps">위치정보 부족</button>
+                <button class="btn g" type="button" data-csub="phone">연락처 누락</button>
+                <button class="btn g" type="button" data-csub="kg">생산량 누락</button>
               </div>
               <div class="bar" style="margin-bottom:8px" id="complete-toolbar">
-                <span class="hint">현장에 보내는 것은 이 판의 건만입니다.</span>
+                <span class="hint">현장 확인이 필요한 항목만 조사원에게 배정할 수 있습니다.</span>
                 <span class="sp"></span>
                 <span class="hint" id="complete-selected">0건 선택됨</span>
-                <a class="btn p" href="#assign" id="complete-assign">선택한 건을 조사원에게 배정</a>
+                <a class="btn p" href="#assign" id="complete-assign">선택한 건 조사원에게 배정</a>
               </div>
               <div id="empty-gap" class="keep hide" style="margin-bottom:10px"></div>
               <table>
-                <thead><tr><th></th><th>농장</th><th>빠진 칸</th><th>다음에 할 일</th></tr></thead>
+                <thead><tr><th></th><th>농장</th><th>누락된 정보</th><th>처리 방법</th></tr></thead>
                 <tbody id="tbody-gap"></tbody>
               </table>
             </div>
           </section>
           <section class="issue-board kind-error" id="board-error">
-            <div class="board-hd"><div><strong>형식 오류</strong><span>값은 있는데 틀림 · <span id="board-error-n">0</span>곳</span></div><span>다음에 할 일 · 잘못된 값을 고침</span></div>
+            <div class="board-hd"><div><strong>형식 오류</strong><span>입력값 수정이 필요한 농장 · <span id="board-error-n">0</span>곳</span></div><span>입력값의 형식, 범위 또는 데이터 간 관계가 기준에 맞지 않습니다.</span></div>
             <div class="board-bd">
               <div id="empty-error" class="keep hide" style="margin-bottom:10px"></div>
               <table>
-                <thead><tr><th>농장</th><th>잘못된 값</th><th>허용 · 올바른 예</th><th>다음에 할 일</th></tr></thead>
+                <thead><tr><th>농장</th><th>오류 항목</th><th>처리 방법</th></tr></thead>
                 <tbody id="tbody-error"></tbody>
               </table>
             </div>
           </section>
           <section class="issue-board kind-dup" id="board-dup">
-            <div class="board-hd"><div><strong>중복 후보</strong><span>같은 대상으로 보임 · <span id="board-dup-n">0</span>곳</span></div><span>다음에 할 일 · 연결 여부 확인</span></div>
+            <div class="board-hd"><div><strong>중복 후보</strong><span>기존 데이터와 연결 여부를 확인해야 하는 항목 · <span id="board-dup-n">0</span>곳</span></div><span>동일하거나 유사한 농장·협동조합이 이미 등록되어 있는지 확인합니다.</span></div>
             <div class="board-bd">
               <div id="empty-dup" class="keep hide" style="margin-bottom:10px"></div>
               <table>
-                <thead><tr><th>농장</th><th>같아 보이는 대상</th><th>일치 이유</th><th>다음에 할 일</th></tr></thead>
+                <thead><tr><th>농장</th><th>중복 의심 사유</th><th>처리 방법</th></tr></thead>
                 <tbody id="tbody-dup"></tbody>
               </table>
             </div>
           </section>
           <section class="issue-board kind-ready" id="board-ready">
-            <div class="board-hd"><div><strong>필수정보 입력 완료</strong><span>문서에 넣을 수 있음 · <span id="board-ready-n">0</span>곳</span></div><span>오류·중복이 있으면 해당 판에서 따로 봅니다</span></div>
+            <div class="board-hd"><div><strong>필수정보 입력 완료</strong><span>필수정보 입력이 완료된 항목 · <span id="board-ready-n">0</span>곳</span></div><span>필수값 입력은 완료되었습니다. 다만 오류 또는 중복 문제가 남아 있는 경우 해당 문제를 먼저 확인해야 합니다.</span></div>
             <div class="board-bd">
               <div id="empty-ready" class="keep hide" style="margin-bottom:10px"></div>
               <table>
-                <thead><tr><th>농장</th><th>상태</th><th>다른 유형</th><th>다음에 할 일</th></tr></thead>
+                <thead><tr><th>농장</th><th>상태</th><th>추가 확인 필요</th><th>처리 방법</th></tr></thead>
                 <tbody id="tbody-ready"></tbody>
               </table>
             </div>

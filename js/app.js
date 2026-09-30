@@ -90,43 +90,96 @@
   }
 
   function otherIssueHint(farm, current) {
-    const bits = [];
-    if (current !== "gap" && Store.farmGapItems(farm).length) bits.push("누락");
-    if (current !== "error" && Store.farmErrorItems(farm).length) bits.push("형식 오류");
-    if (current !== "dup" && Store.farmDupItems(farm).length) bits.push("중복");
-    if (!bits.length) return "";
-    return '<div class="hint">같은 농장에 ' + bits.join(" · ") + "도 있습니다. 해당 색 판에서 따로 봅니다.</div>";
+    const lines = [];
+    const hasGap = Store.farmGapItems(farm).length;
+    const hasErr = Store.farmErrorItems(farm).length;
+    const hasDup = Store.farmDupItems(farm).length;
+    if (current === "gap" && hasErr) {
+      lines.push("이 농장에는 <b>형식 오류도 있습니다.</b> 형식 오류 탭에서 함께 확인할 수 있습니다.");
+    }
+    if (current === "gap" && hasDup) {
+      lines.push("이 농장에는 <b>중복 후보도 있습니다.</b> 중복 후보 탭에서 함께 확인할 수 있습니다.");
+    }
+    if (current === "error" && hasDup) {
+      lines.push("이 항목에는 <b>중복 후보도 있습니다.</b> 중복 후보 탭에서 함께 확인할 수 있습니다.");
+    }
+    if (current === "error" && hasGap) {
+      lines.push("이 농장에는 <b>누락 정보도 있습니다.</b> 누락 탭에서 함께 확인할 수 있습니다.");
+    }
+    if (current === "dup" && hasErr) {
+      lines.push("이 항목에는 <b>형식 오류도 있습니다.</b> 형식 오류 탭에서 함께 확인할 수 있습니다.");
+    }
+    if (current === "dup" && hasGap) {
+      lines.push("이 농장에는 <b>누락 정보도 있습니다.</b> 누락 탭에서 함께 확인할 수 있습니다.");
+    }
+    if (!lines.length) return "";
+    return lines.map((t) => '<div class="hint">' + t + "</div>").join("");
+  }
+
+  function farmerLabel(farm) {
+    if (!farm.farmer || farm.farmer === "(조합)") return "협동조합";
+    return farm.farmer;
   }
 
   function farmCell(farm) {
     return "<b>" + escapeHtml(farm.name) + "</b><div class=\"hint\">" +
-      escapeHtml(farm.farmer) + " · " + escapeHtml(sourceLabel(farm.source)) + " · " + plotCount(farm) + "</div>";
+      escapeHtml(farmerLabel(farm)) + " · " + escapeHtml(sourceLabel(farm.source)) + " · " + plotCount(farm) + "</div>";
+  }
+
+  function joinNeed(parts) {
+    if (!parts.length) return "";
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2) return parts[0] + "와 " + parts[1];
+    return parts.slice(0, -1).join(", ") + ", " + parts[parts.length - 1];
+  }
+
+  function objectParticle(word) {
+    const ch = String(word || "").slice(-1);
+    const code = ch.charCodeAt(0);
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      return ((code - 0xac00) % 28) ? "을" : "를";
+    }
+    return "을";
   }
 
   function nextAction(farm, filt) {
     if (filt === "error") {
-      return "잘못된 값을 고칩니다. 빈 칸을 채우는 일과 다릅니다.";
+      const items = Store.farmErrorItems(farm);
+      if (items.some((i) => i.code === "area")) {
+        return "입력 면적과 GPS 정보를 다시 확인한 후 올바른 값으로 수정합니다.";
+      }
+      return "좌표값을 확인하여 올바른 값으로 수정합니다.";
     }
     if (filt === "dup") {
-      return "기존 정보에 연결할지, 새 농장으로 둘지 고릅니다.";
+      return "기존 데이터에 연결할지, 새로운 항목으로 등록할지 선택합니다.";
     }
     if (filt === "ready") {
-      return '<a href="#dds" data-farm="' + farm.id + '">DDS 문서로 이동합니다</a>';
+      return '<a href="#dds" data-farm="' + farm.id + '">DDS 준비 상태 확인</a>';
     }
     const bits = [];
     if (!farm.phone) bits.push("연락처");
     const pts = Store.locPts(farm);
-    if (pts < 3) bits.push(pts === 0 ? "위치" : "경계 점 " + (3 - pts) + "개");
+    if (pts === 0) bits.push("위치정보");
+    else if (pts < 3) bits.push("경계점 " + (3 - pts) + "개");
     if (farm.kg === "" || farm.kg == null) bits.push("생산량");
-    const need = bits.join("·");
+    const need = joinNeed(bits);
+    const particle = objectParticle(bits[bits.length - 1]);
     if (farm.lastSurvey) {
-      return need + "만 보완하면 됩니다. <a href=\"#farm\" data-farm=\"" + farm.id + "\">기존 농장에서 확인</a>";
+      if (bits.length === 1 && bits[0] === "생산량") {
+        return "기존 농장 정보에서 생산량을 확인하여 보완합니다. <a href=\"#farm\" data-farm=\"" + farm.id + "\">기존 농장 정보 확인</a>";
+      }
+      if (bits.length === 1 && bits[0].indexOf("경계점") === 0) {
+        return "기존 정보를 확인하여 " + bits[0] + particle + " 추가합니다. <a href=\"#farm\" data-farm=\"" + farm.id + "\">기존 농장 정보 확인</a>";
+      }
+      return "기존 정보를 확인하여 " + need + particle + " 보완합니다. <a href=\"#farm\" data-farm=\"" + farm.id + "\">기존 농장 정보 확인</a>";
     }
-    return "현장에서 " + need + "를 채웁니다. <a href=\"#assign\" data-farm=\"" + farm.id + "\">조사원에게 배정</a>";
+    const extra = pts === 2;
+    const verb = extra ? " 추가 입력합니다." : " 확인하여 입력합니다.";
+    return "현장에서 " + need + particle + verb + ' <a href="#assign" data-farm="' + farm.id + '">조사원에게 배정</a>';
   }
 
   function plotCount(farm) {
-    return "위치 " + Store.locPts(farm) + "/3";
+    return "위치정보 " + Store.locPts(farm) + "/3";
   }
 
   function sourceLabel(src) {
@@ -277,10 +330,10 @@
     const c = Store.counts();
     const filt = st.completeFilter || "all";
     const sub = st.completeSubfilter || "all";
-    $("kpi-ready").textContent = c.ready;
-    $("kpi-gap").textContent = c.gap;
-    $("kpi-dup").textContent = c.dup;
-    $("kpi-error").textContent = c.error;
+    $("kpi-ready").textContent = c.ready + "곳";
+    $("kpi-gap").textContent = c.gap + "곳";
+    $("kpi-dup").textContent = c.dup + "곳";
+    $("kpi-error").textContent = c.error + "곳";
     $("board-gap-n").textContent = c.gap;
     $("board-error-n").textContent = c.error;
     $("board-dup-n").textContent = c.dup;
@@ -294,30 +347,30 @@
     });
 
     $("complete-tax").innerHTML =
-      '<article class="tax gap"><div class="tax-k">유형 1 · 누락</div><b>칸이 비어 있음</b>' +
-      "<p>채울 값이 없습니다. 틀린 값이 아닙니다.</p><div class=\"kinds\">" +
-      '<span class="b gap">연락처 없음 ' + c.phone + "</span>" +
-      '<span class="b gap">위치 부족 ' + c.gps + "</span>" +
-      '<span class="b gap">생산량 없음 ' + c.kg + "</span></div>" +
-      '<p class="tax-next">다음에 할 일 · 조사원에게 배정해서 현장에서 채움</p></article>' +
-      '<article class="tax error"><div class="tax-k">유형 2 · 형식 오류</div><b>값은 있는데 틀림</b>' +
-      "<p>빈 칸이 아니라, 허용 범위를 벗어난 값입니다.</p><div class=\"kinds\">" +
-      '<span class="b bad">좌표 범위 ' + c.lat + "</span>" +
-      '<span class="b bad">면적 불일치 ' + c.area + "</span>" +
-      '<span class="b bad">숫자 아님 ' + c.kgnum + "</span></div>" +
-      '<p class="tax-next">다음에 할 일 · 잘못된 값을 고침 · 현장 배정 아님</p></article>' +
-      '<article class="tax dup"><div class="tax-k">유형 3 · 중복</div><b>같은 대상으로 보임</b>' +
-      "<p>이미 있는 농장·조합과 이름이 같아 연결 여부를 고릅니다.</p><div class=\"kinds\">" +
-      '<span class="b dup">조합명과 같음 ' + c.dupCoop + "</span>" +
-      '<span class="b dup">농장명 유사 ' + c.dupFarm + "</span></div>" +
-      '<p class="tax-next">다음에 할 일 · 기존에 연결할지, 새 건으로 둘지 확인</p></article>';
+      '<button class="tax gap' + (filt === "gap" ? " on" : "") + '" type="button" data-cfilter="gap"><div class="tax-k">누락</div><b>필수 정보가 입력되지 않았습니다.</b>' +
+      "<p>값이 잘못된 것이 아니라, 아직 입력되지 않은 항목입니다.</p><div class=\"kinds\">" +
+      '<span class="b gap">연락처 누락 ' + c.phone + "건</span>" +
+      '<span class="b gap">위치정보 부족 ' + c.gps + "건</span>" +
+      '<span class="b gap">생산량 누락 ' + c.kg + "건</span></div>" +
+      '<p class="tax-next">처리 방법 · 현장 확인이 필요한 건은 조사원에게 배정하여 누락된 정보를 입력합니다.</p></button>' +
+      '<button class="tax error' + (filt === "error" ? " on" : "") + '" type="button" data-cfilter="error"><div class="tax-k">형식 오류</div><b>입력된 값에 오류가 있습니다.</b>' +
+      "<p>값은 입력되어 있지만 허용 범위, 형식 또는 기준에 맞지 않습니다.</p><div class=\"kinds\">" +
+      '<span class="b bad">좌표 범위 오류 ' + c.lat + "건</span>" +
+      '<span class="b bad">면적 불일치 ' + c.area + "건</span>" +
+      '<span class="b bad">숫자 형식 오류 ' + c.kgnum + "건</span></div>" +
+      '<p class="tax-next">처리 방법 · 잘못 입력된 값을 확인하고 수정합니다. 현장 조사 배정이 반드시 필요한 것은 아닙니다.</p></button>' +
+      '<button class="tax dup' + (filt === "dup" ? " on" : "") + '" type="button" data-cfilter="dup"><div class="tax-k">중복 후보</div><b>기존 데이터와 동일하거나 유사한 대상이 있습니다.</b>' +
+      "<p>이미 등록된 농장 또는 협동조합과 같은 대상으로 판단될 가능성이 있습니다.</p><div class=\"kinds\">" +
+      '<span class="b dup">협동조합명 일치 ' + c.dupCoop + "건</span>" +
+      '<span class="b dup">농장명 유사 ' + c.dupFarm + "건</span></div>" +
+      '<p class="tax-next">처리 방법 · 기존 데이터에 연결할지, 새로운 항목으로 등록할지 확인합니다.</p></button>';
 
     const hints = {
-      all: "세 유형을 색이 다른 판으로 같이 봅니다. 한 농장이 여러 판에 나올 수 있습니다.",
-      gap: "누락만 봅니다. 빠진 칸이 있는 건입니다. 선택한 건만 조사원에게 배정합니다.",
-      error: "형식 오류만 봅니다. 값이 잘못된 건입니다. 빈 칸이 아니라 틀린 값을 고칩니다.",
-      dup: "중복만 봅니다. 이미 있는 정보와 같아 보이는 건입니다. 연결 여부를 확인합니다.",
-      ready: "필수정보가 채워진 건입니다. 오류·중복이 남아 있으면 위 판에서 따로 처리합니다."
+      all: "한 농장에 여러 유형의 문제가 있을 수 있어 동일한 농장이 여러 항목에 표시될 수 있습니다.",
+      gap: "누락만 봅니다. 필수 정보가 입력되지 않은 건입니다. 선택한 건만 조사원에게 배정합니다.",
+      error: "형식 오류만 봅니다. 입력값 수정이 필요한 건입니다. 현장 조사 배정이 반드시 필요한 것은 아닙니다.",
+      dup: "중복 후보만 봅니다. 기존 데이터와 연결 여부를 확인합니다.",
+      ready: "필수값 입력은 완료되었습니다. 오류 또는 중복이 남아 있으면 해당 문제를 먼저 확인합니다."
     };
     $("complete-view-hint").textContent = "전체 " + c.all + "곳 · " + (hints[filt] || hints.all);
     $("complete-search").value = st.completeQuery;
@@ -325,15 +378,15 @@
     qsa("#complete-sub [data-csub]").forEach((b) => {
       b.className = "btn " + (b.dataset.csub === sub ? "p" : "g");
       if (b.dataset.csub === "all") b.textContent = "전체 누락 " + c.gap;
-      if (b.dataset.csub === "gps") b.textContent = "위치 부족 " + c.gps;
-      if (b.dataset.csub === "phone") b.textContent = "연락처 없음 " + c.phone;
-      if (b.dataset.csub === "kg") b.textContent = "생산량 없음 " + c.kg;
+      if (b.dataset.csub === "gps") b.textContent = "위치정보 부족 " + c.gps;
+      if (b.dataset.csub === "phone") b.textContent = "연락처 누락 " + c.phone;
+      if (b.dataset.csub === "kg") b.textContent = "생산량 누락 " + c.kg;
     });
 
     const gapRows = Store.farmsByIssue("gap");
     const visibleSel = gapRows.filter((f) => selected.has(f.id)).length;
     $("complete-selected").textContent = visibleSel + "건 선택됨";
-    $("complete-assign").textContent = "선택한 " + visibleSel + "건을 조사원에게 배정";
+    $("complete-assign").textContent = "선택한 " + visibleSel + "건 조사원에게 배정";
 
     function setEmpty(id, rows, html) {
       const el = $(id);
@@ -345,68 +398,66 @@
         el.innerHTML = "";
       }
     }
-    setEmpty("empty-gap", gapRows, '<p class="hint">빠진 칸이 있는 농장이 없습니다.</p>');
+    setEmpty("empty-gap", gapRows, '<p class="hint">필수 정보가 입력되지 않은 농장이 없습니다.</p>');
     const errRows = Store.farmsByIssue("error");
     setEmpty("empty-error", errRows,
-      "<b>지금 고칠 형식 오류는 없습니다.</b>" +
-      '<p class="hint" style="margin-top:6px">값이 잘못된 건이 아니라, 아직 안 채운 칸은 주황 <b>누락</b> 판에서 봅니다.</p>');
+      "<b>지금 수정할 형식 오류는 없습니다.</b>" +
+      '<p class="hint" style="margin-top:6px">입력되지 않은 항목은 주황 <b>누락</b>에서 확인합니다.</p>');
     const dupRows = Store.farmsByIssue("dup");
     setEmpty("empty-dup", dupRows,
       "<b>지금 확인할 중복 후보는 없습니다.</b>" +
-      '<p class="hint" style="margin-top:6px">이름이 조합·기존 농장과 같으면 보라 판에 모입니다.</p>');
+      '<p class="hint" style="margin-top:6px">기존 농장·협동조합과 같으면 보라 중복 후보에 모입니다.</p>');
     const readyRows = Store.farmsByIssue("ready");
-    setEmpty("empty-ready", readyRows, '<p class="hint">필수정보가 채워진 농장이 없습니다.</p>');
+    setEmpty("empty-ready", readyRows, '<p class="hint">필수정보 입력이 완료된 항목이 없습니다.</p>');
 
     $("tbody-gap").innerHTML = gapRows.map((f) => {
       const checked = selected.has(f.id) ? " checked" : "";
       const items = Store.farmGapItems(f);
       return '<tr class="clickable" data-farm="' + f.id + '">' +
         '<td><input type="checkbox" data-sel="' + f.id + '"' + checked + "></td>" +
-        "<td>" + farmCell(f) + otherIssueHint(f, "gap") + "</td>" +
+        "<td>" + farmCell(f) + "</td>" +
         "<td><div class=\"prob\">" + items.map((i) =>
           '<span class="b gap">' + escapeHtml(i.title) + "</span>" +
           '<span class="hint">' + escapeHtml(i.detail) + "</span>"
-        ).join("") + "</div></td>" +
+        ).join("") + otherIssueHint(f, "gap") + "</div></td>" +
         "<td>" + nextAction(f, "gap") + "</td></tr>";
     }).join("");
 
     $("tbody-error").innerHTML = errRows.map((f) => {
       const items = Store.farmErrorItems(f);
       return '<tr class="clickable" data-farm="' + f.id + '">' +
-        "<td>" + farmCell(f) + otherIssueHint(f, "error") + "</td>" +
+        "<td>" + farmCell(f) + "</td>" +
         "<td><div class=\"prob\">" + items.map((i) =>
           '<span class="b bad">' + escapeHtml(i.title) + "</span>" +
-          '<div>입력 <span class="got">' + escapeHtml(i.value || "") + "</span></div>"
-        ).join("") + "</div></td>" +
-        "<td><div class=\"prob\">" + items.map((i) =>
-          '<span class="hint">허용 ' + escapeHtml(i.expect || "") + "</span>" +
-          (i.example ? '<div>예 <span class="okv">' + escapeHtml(i.example) + "</span></div>" : "")
-        ).join("") + "</div></td>" +
+          '<div class="hint">' + escapeHtml(i.valueLabel || "입력값") + ': <span class="got">' + escapeHtml(i.value || "") + "</span></div>" +
+          '<div class="hint">' + escapeHtml(i.expectLabel || "허용 범위") + ': <span class="okv">' + escapeHtml(i.expect || "") + "</span></div>" +
+          (i.example ? '<div class="hint">' + escapeHtml(i.exampleLabel || "정상값 예시") + ': <span class="okv">' + escapeHtml(i.example) + "</span></div>" : "") +
+          (i.note ? '<div class="hint">' + escapeHtml(i.note) + "</div>" : "")
+        ).join("") + otherIssueHint(f, "error") + "</div></td>" +
         "<td>" + nextAction(f, "error") + "</td></tr>";
     }).join("");
 
     $("tbody-dup").innerHTML = dupRows.map((f) => {
       const items = Store.farmDupItems(f);
       return '<tr class="clickable" data-farm="' + f.id + '">' +
-        "<td>" + farmCell(f) + otherIssueHint(f, "dup") + "</td>" +
+        "<td>" + farmCell(f) + "</td>" +
         "<td><div class=\"prob\">" + items.map((i) =>
           '<span class="b dup">' + escapeHtml(i.title) + "</span>" +
-          "<div><b>" + escapeHtml(i.target) + "</b></div>"
-        ).join("") + "</div></td>" +
-        "<td><div class=\"prob\">" + items.map((i) =>
-          '<span class="hint">' + escapeHtml(i.reason) + " · 일치 " + i.score + "%</span>"
-        ).join("") + "</div></td>" +
+          '<div class="hint">기존 대상: <b>' + escapeHtml(i.target) + "</b></div>" +
+          '<div class="hint">일치도: ' + i.score + "%</div>" +
+          '<div class="hint">' + escapeHtml(i.reason) + "</div>"
+        ).join("") + otherIssueHint(f, "dup") + "</div></td>" +
         "<td>" + nextAction(f, "dup") + "</td></tr>";
     }).join("");
 
     $("tbody-ready").innerHTML = readyRows.map((f) => {
       const extra = [];
       if (Store.farmErrorItems(f).length) extra.push('<span class="b bad">형식 오류 있음</span>');
-      if (Store.farmDupItems(f).length) extra.push('<span class="b dup">중복 후보</span>');
+      if (Store.farmDupItems(f).length) extra.push('<span class="b dup">중복 후보 있음</span>');
       return '<tr class="clickable" data-farm="' + f.id + '">' +
         "<td>" + farmCell(f) + "</td>" +
         '<td><span class="b ok">필수정보 입력 완료</span></td>' +
-        "<td>" + (extra.join(" ") || '<span class="hint">다른 유형 없음</span>') + "</td>" +
+        "<td>" + (extra.length ? '<div class="hint">추가 확인 필요</div>' + extra.join(" ") : '<span class="hint">추가 확인이 필요한 문제가 없습니다.</span>') + "</td>" +
         "<td>" + nextAction(f, "ready") + "</td></tr>";
     }).join("");
   }
@@ -813,9 +864,9 @@
       '<div class="card"><span>현장조사 진행 중</span><b>' + c.surveying + "</b></div>" +
       '<div class="card"><span>DDS/EUDR에 사용 가능</span><b style="color:#166534">' + c.ready + "</b></div>";
     const todos = [];
-    if (c.gap) todos.push('<a class="li" href="#complete"><b>누락(빠진 칸) ' + c.gap + "건</b><div class=\"hint\">빈 연락처·위치·생산량을 확인하고 조사원에게 배정합니다.</div></a>");
-    if (c.dup) todos.push('<a class="li" href="#complete"><b>중복 후보 ' + c.dup + "건</b><div class=\"hint\">같은 화면의 중복 카드에서 연결 여부를 확인합니다.</div></a>");
-    if (c.error) todos.push('<a class="li" href="#complete"><b>형식 오류 ' + c.error + "건</b><div class=\"hint\">틀린 좌표·면적을 고칩니다. 빈 칸과는 다릅니다.</div></a>");
+    if (c.gap) todos.push('<a class="li" href="#complete"><b>누락 ' + c.gap + "곳</b><div class=\"hint\">입력되지 않은 정보를 확인하고 필요한 경우 조사원에게 배정합니다.</div></a>");
+    if (c.dup) todos.push('<a class="li" href="#complete"><b>중복 후보 ' + c.dup + "곳</b><div class=\"hint\">기존 데이터에 연결할지, 새 항목으로 등록할지 확인합니다.</div></a>");
+    if (c.error) todos.push('<a class="li" href="#complete"><b>형식 오류 ' + c.error + "곳</b><div class=\"hint\">허용 범위를 벗어난 값을 확인하고 수정합니다.</div></a>");
     if (Store.bySurveyStatus("new").length) {
       todos.push('<a class="li" href="#assign"><b>배정 대기 ' + Store.bySurveyStatus("new").length + "건</b><div class=\"hint\">조사원을 고르고 현장조사를 보냅니다.</div></a>");
     }
@@ -1109,13 +1160,15 @@
       st.completeQuery = e.target.value;
       renderComplete();
     });
-    $("complete-kpi").addEventListener("click", (e) => {
+    function onCompleteFilter(e) {
       const b = e.target.closest("[data-cfilter]");
       if (!b) return;
       st.completeFilter = st.completeFilter === b.dataset.cfilter ? "all" : b.dataset.cfilter;
       st.completeSubfilter = "all";
       renderComplete();
-    });
+    }
+    $("complete-tax").addEventListener("click", onCompleteFilter);
+    $("complete-kpi").addEventListener("click", onCompleteFilter);
     $("complete-sub").addEventListener("click", (e) => {
       const b = e.target.closest("[data-csub]");
       if (!b) return;

@@ -12,20 +12,20 @@
   function farmGapItems(farm) {
     const items = [];
     if (!farm.phone) {
-      items.push({ code: "phone", title: "연락처 없음", detail: "전화·메일이 비어 있습니다." });
+      items.push({ code: "phone", title: "연락처 미입력", detail: "전화번호 또는 이메일이 입력되지 않았습니다." });
     }
     const pts = locPts(farm);
     if (pts < 3) {
       items.push({
         code: "gps",
-        title: "위치 " + pts + "/3",
+        title: "위치정보 부족 · " + pts + "/3",
         detail: pts === 0
-          ? "경계 점이 없습니다. 3개가 필요합니다."
-          : "경계 점 " + pts + "개입니다. 3개가 필요합니다."
+          ? "재배지 경계점이 등록되지 않았습니다. 최소 3개가 필요합니다."
+          : "경계점이 " + (3 - pts) + "개 더 필요합니다."
       });
     }
     if (farm.kg === "" || farm.kg === null || farm.kg === undefined) {
-      items.push({ code: "kg", title: "생산량 없음", detail: "올해 수확량(kg)이 비어 있습니다." });
+      items.push({ code: "kg", title: "생산량 미입력", detail: "올해 수확량(kg)이 입력되지 않았습니다." });
     }
     return items;
   }
@@ -195,8 +195,12 @@
             code: "lat",
             title: "위도 범위 오류",
             value: String(pt.lat),
+            valueLabel: "입력값",
             expect: "-90 ~ 90",
-            example: "2.9273"
+            expectLabel: "허용 범위",
+            example: "2.9273",
+            exampleLabel: "정상값 예시",
+            note: "위도 값이 허용 범위를 벗어났습니다."
           });
         }
         if (pt.lng < -180 || pt.lng > 180) {
@@ -204,8 +208,12 @@
             code: "lng",
             title: "경도 범위 오류",
             value: String(pt.lng),
+            valueLabel: "입력값",
             expect: "-180 ~ 180",
-            example: "-75.2819"
+            expectLabel: "허용 범위",
+            example: "-75.2819",
+            exampleLabel: "정상값 예시",
+            note: "경도 값이 허용 범위를 벗어났습니다."
           });
         }
       });
@@ -213,10 +221,14 @@
     if (farm.kg !== "" && farm.kg != null && isNaN(Number(farm.kg))) {
       items.push({
         code: "kgnum",
-        title: "생산량이 숫자가 아님",
+        title: "숫자 형식 오류",
         value: String(farm.kg),
+        valueLabel: "입력값",
         expect: "숫자(kg)",
-        example: "860"
+        expectLabel: "허용 형식",
+        example: "860",
+        exampleLabel: "정상값 예시",
+        note: "생산량 값이 숫자가 아닙니다."
       });
     }
     const calc = calcAreaHa(farm);
@@ -226,9 +238,13 @@
         items.push({
           code: "area",
           title: "면적 불일치",
-          value: entered + "ha",
-          expect: "경계 계산 " + calc + "ha",
-          example: "차이 30% 이내"
+          value: entered + " ha",
+          valueLabel: "입력 면적",
+          expect: calc + " ha",
+          expectLabel: "GPS 경계 기준 계산 면적",
+          example: "차이 30% 이내",
+          exampleLabel: "허용 기준 예시",
+          note: "입력 면적과 GPS 기준 면적의 차이가 허용 범위를 초과했습니다."
         });
       }
     }
@@ -244,9 +260,9 @@
       if (h.kind === "coop") {
         return {
           code: "coop",
-          title: "조합명과 같음",
+          title: "협동조합명과 동일",
           target: h.other.name,
-          reason: "농장 이름이 협동조합 이름과 같습니다.",
+          reason: "농장명이 기존 협동조합명과 동일합니다.",
           score: h.score
         };
       }
